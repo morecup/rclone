@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="test" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="rclone" />
+    <working_directory value="$PROJECT_DIR$" />
+    <kind value="PACKAGE" />
+    <package value="github.com/rclone/rclone" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/rclone.go" />
+    <method v="2" />
+  </configuration>
+</component>
