@@ -150,6 +150,10 @@ type Transport struct {
 	metrics       *Metrics
 }
 
+func (t *Transport) SetUserAgent(s string) {
+	t.userAgent = s
+}
+
 // newTransport wraps the http.Transport passed in and logs all
 // roundtrips including the body if logBody is set.
 func newTransport(ci *fs.ConfigInfo, transport *http.Transport) *Transport {

@@ -2,7 +2,7 @@
   <configuration default="false" name="copy" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="copy D:\1\test.txt OneDrive_local: -vv -P" />
+    <parameters value="copy OneDrive_local:\test.txt OneDrive_local:\1 -vv -P" />
     <envs>
       <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
       <env name="http_proxy" value="http://127.0.0.1:8888" />

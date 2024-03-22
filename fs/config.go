@@ -178,7 +178,8 @@ func NewConfig() *ConfigInfo {
 	c.MaxDepth = -1
 	c.DataRateUnit = "bytes"
 	c.BufferSize = SizeSuffix(16 << 20)
-	c.UserAgent = "rclone/" + Version
+	//c.UserAgent = "rclone/" + Version
+	c.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 	c.StreamingUploadCutoff = SizeSuffix(100 * 1024)
 	c.MaxStatsGroups = 1000
 	c.StatsFileNameLength = 45

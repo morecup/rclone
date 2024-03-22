@@ -2,7 +2,7 @@
   <configuration default="false" name="baidu copy" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="copy D:\1\test.txt baidu: -vv" />
+    <parameters value="copy baidupan:\test\test_6.txt baidupan:\2 -vv" />
     <envs>
       <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
       <env name="http_proxy" value="http://127.0.0.1:8888" />
