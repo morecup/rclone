@@ -76,10 +76,11 @@ func (b *BaiduApi) GetTemplateVariable() (opts *rest.Opts, err error) {
 }
 
 // Disguise as a Baidu client.can down all file but will be limit speed.
-func (b *BaiduApi) DownFileDisguiseBaiduClient() (opts *rest.Opts, err error) {
+func (b *BaiduApi) DownFileDisguiseBaiduClient(dLink string) (opts *rest.Opts, err error) {
 	opts = &rest.Opts{
-		Method:       "GET",
-		ExtraHeaders: map[string]string{"User-Agent": "pan.baidu.com"},
+		Method:  "GET",
+		RootURL: dLink,
+		//ExtraHeaders: map[string]string{"User-Agent": "pan.baidu.com"},
 	}
 	return opts, nil
 }
@@ -218,12 +219,10 @@ func (b *BaiduApi) precreate(path string, rapidOffsetData RapidOffsetData, preCr
 	}
 	return opts, nil
 }
-func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker, size int64) (opts *rest.Opts, err error) {
-
+func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker) (opts *rest.Opts, err error) {
 	opts = &rest.Opts{
-		Method:        "POST",
-		Path:          "/api/precreate",
-		ContentLength: &size,
+		Method:  "POST",
+		RootURL: "https://d.pcs.baidu.com/rest/2.0/pcs/file",
 		Parameters: url.Values{
 			"method":   []string{"upload"},
 			"type":     []string{"tmpfile"},
@@ -232,6 +231,28 @@ func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk i
 			"partseq":  []string{strconv.Itoa(partseq)},
 		},
 		Body: chunk,
+	}
+	return opts, nil
+}
+
+// 上传
+func (b *BaiduApi) create(path string, preCreateFileData PreCreateFileData, uploadId string) (opts *rest.Opts, err error) {
+	encoder := schema.NewEncoder()
+	data := url.Values{}
+	err = encoder.Encode(preCreateFileData, data)
+	if err != nil {
+		return nil, err
+	}
+	data.Add("path", FixToBaiduPath(path))
+	data.Add("isdir", "0")
+	data.Add("uploadid", uploadId)
+	data.Add("rtype", "1")
+
+	opts = &rest.Opts{
+		Method:      "POST",
+		Path:        "/api/create",
+		ContentType: "application/x-www-form-urlencoded",
+		Body:        strings.NewReader(data.Encode()),
 	}
 	return opts, nil
 }

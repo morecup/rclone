@@ -46,10 +46,9 @@ func (f *Fs) DownFileDisguiseBaiduClient(ctx context.Context, path string, optio
 	if item.Dlink == "" {
 		return nil, errors.WithStack(fmt.Errorf("dlink is empty. path:(%s)", path))
 	}
-	opts, err := f.api.DownFileDisguiseBaiduClient()
+	opts, err := f.api.DownFileDisguiseBaiduClient(item.Dlink)
 	opts.Options = options
 	err = f.pacer.Call(func() (bool, error) {
-		f.unAuth.SetRoot(item.Dlink)
 		resp, err = f.unAuth.Call(ctx, opts)
 		return shouldRetry(ctx, resp, err)
 	})
