@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/gorilla/schema"
 	"github.com/rclone/rclone/lib/rest"
+	"io"
 	"net/url"
 	"strconv"
 	"strings"
@@ -189,4 +191,47 @@ func FixToBaiduPathList(rclonePath []string) []string {
 		rclonePath[i] = FixToBaiduPath(rclonePath[i])
 	}
 	return rclonePath
+}
+
+// 上传
+func (b *BaiduApi) precreate(path string, rapidOffsetData RapidOffsetData, preCreateFileData PreCreateFileData) (opts *rest.Opts, err error) {
+	encoder := schema.NewEncoder()
+	data := url.Values{}
+	err = encoder.Encode(rapidOffsetData, data)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(preCreateFileData, data)
+	if err != nil {
+		return nil, err
+	}
+	data.Add("path", FixToBaiduPath(path))
+	data.Add("isdir", "0")
+	data.Add("autoinit", "1")
+	data.Add("rtype", "1")
+
+	opts = &rest.Opts{
+		Method:      "POST",
+		Path:        "/api/precreate",
+		ContentType: "application/x-www-form-urlencoded",
+		Body:        strings.NewReader(data.Encode()),
+	}
+	return opts, nil
+}
+func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker, size int64) (opts *rest.Opts, err error) {
+
+	opts = &rest.Opts{
+		Method:        "POST",
+		Path:          "/api/precreate",
+		ContentLength: &size,
+		Parameters: url.Values{
+			"method":   []string{"upload"},
+			"type":     []string{"tmpfile"},
+			"path":     []string{FixToBaiduPath(path)},
+			"uploadid": []string{uploadId},
+			"partseq":  []string{strconv.Itoa(partseq)},
+		},
+		Body: chunk,
+	}
+	return opts, nil
 }

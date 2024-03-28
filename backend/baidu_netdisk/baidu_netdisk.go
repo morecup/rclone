@@ -272,7 +272,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 
 	transport := client.Transport.(*fshttp.Transport)
-	transport.SetUserAgent("pan.baidu.com")
+	transport.SetUserAgent("netdisk;2.2.51.6;netdisk;10.0.63;PC;android-android")
 	f := &Fs{
 		name:     name,
 		root:     root,
@@ -448,11 +448,23 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 	size := src.Size()
 	modTime := src.ModTime(ctx)
 
-	o, _, _, err := f.createObject(ctx, remote, modTime, size)
-	if err != nil {
-		return nil, err
-	}
+	o := f.buildObject(ctx, remote, modTime, size)
+
 	return o, o.Update(ctx, in, src, options...)
+}
+
+func (f *Fs) buildObject(ctx context.Context, remote string, modTime time.Time, size int64) (o *Object) {
+	return &Object{
+		fs:            f,
+		remote:        remote,
+		hasMetaData:   true,
+		isOneNoteFile: false,
+		size:          size,
+		modTime:       modTime,
+		id:            "",
+		hash:          "md5",
+		mimeType:      "json",
+	}
 }
 
 func (f *Fs) Mkdir(ctx context.Context, dir string) error {
