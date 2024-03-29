@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"github.com/gorilla/schema"
+	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/lib/rest"
 	"io"
 	"net/url"
@@ -195,7 +196,7 @@ func FixToBaiduPathList(rclonePath []string) []string {
 }
 
 // 上传
-func (b *BaiduApi) precreate(path string, rapidOffsetData RapidOffsetData, preCreateFileData PreCreateFileData) (opts *rest.Opts, err error) {
+func (b *BaiduApi) Precreate(path string, rapidOffsetData RapidOffsetData, preCreateFileData PreCreateFileData) (opts *rest.Opts, err error) {
 	encoder := schema.NewEncoder()
 	data := url.Values{}
 	err = encoder.Encode(rapidOffsetData, data)
@@ -219,7 +220,7 @@ func (b *BaiduApi) precreate(path string, rapidOffsetData RapidOffsetData, preCr
 	}
 	return opts, nil
 }
-func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker) (opts *rest.Opts, err error) {
+func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption) (opts *rest.Opts, err error) {
 	opts = &rest.Opts{
 		Method:  "POST",
 		RootURL: "https://d.pcs.baidu.com/rest/2.0/pcs/file",
@@ -230,13 +231,14 @@ func (b *BaiduApi) superfile2(path string, uploadId string, partseq int, chunk i
 			"uploadid": []string{uploadId},
 			"partseq":  []string{strconv.Itoa(partseq)},
 		},
-		Body: chunk,
+		Body:    chunk,
+		Options: options,
 	}
 	return opts, nil
 }
 
 // 上传
-func (b *BaiduApi) create(path string, preCreateFileData PreCreateFileData, uploadId string) (opts *rest.Opts, err error) {
+func (b *BaiduApi) Create(path string, preCreateFileData PreCreateFileData, uploadId string) (opts *rest.Opts, err error) {
 	encoder := schema.NewEncoder()
 	data := url.Values{}
 	err = encoder.Encode(preCreateFileData, data)

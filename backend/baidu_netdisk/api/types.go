@@ -108,3 +108,10 @@ type PreCreateFileData struct {
 	LocalCtime string   `schema:"local_ctime"`
 	LocalMtime string   `schema:"local_mtime"`
 }
+
+type FragmentDTO struct {
+	Md5       string `json:"md5"`
+	Partseq   string `json:"partseq"`
+	RequestId int64  `json:"request_id"`
+	UploadId  int32  `json:"uploadid"`
+}

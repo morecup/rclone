@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/backend/baidu_netdisk/api"
 	"github.com/rclone/rclone/fs"
+	"github.com/rclone/rclone/lib/readers"
+	"io"
 	"net/http"
 )
 
@@ -209,4 +211,49 @@ func (f *Fs) MoveOrCopyDirsOrFiles(ctx context.Context, fileParamList []api.File
 
 func (f *Fs) MoveOrCopyDirOrFile(ctx context.Context, fileParamList api.FileManagerParam, operate api.Operate) (err error) {
 	return f.MoveOrCopyDirsOrFiles(ctx, []api.FileManagerParam{fileParamList}, operate)
+}
+
+func (f *Fs) UploadFile(ctx context.Context, in io.Reader, size int64, path string, options ...fs.OpenOption) error{
+
+
+
+	uploadId := ""
+
+	// Upload the chunks
+	remaining := size
+	position := int64(0)
+	partSeq := 0
+	for remaining > 0 {
+		n := int64(f.opt.ChunkSize)
+		if remaining < n {
+			n = remaining
+		}
+		seg := readers.NewRepeatableReader(io.LimitReader(in, n))
+		fs.Debugf(f, "Uploading segment %d/%d size %d", position, size, n)
+		info, err := f.uploadFragment(ctx, path, uploadId, partSeq, seg, options...)
+		if(info.Md5)
+		if err != nil {
+			return nil
+		}
+		remaining -= n
+		position += n
+		partSeq += 1
+	}
+
+}
+func (f *Fs) PreCreate(ctx context.Context, path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption){
+	f.api.Precreate()
+}
+
+func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption) (info *api.FragmentDTO, err error) {
+	opts, err := f.api.Superfile2(path, uploadId, partseq, chunk, options...)
+	if err != nil {
+		return nil, err
+	}
+	info = new(api.FragmentDTO)
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err := f.unAuth.CallJSON(ctx, opts, nil, info)
+		return shouldRetry(ctx, resp, err)
+	})
+	return info,nil
 }
