@@ -94,8 +94,8 @@ type FileManagerParam struct {
 }
 
 type RapidOffsetData struct {
-	DataTime    int64  `schema:"data_time"`
-	DataLength  int    `schema:"data_length"`
+	DataTime int64 `schema:"data_time"`
+	//DataLength  int    `schema:"data_length"`
 	DataOffset  int64  `schema:"data_offset"`
 	DataContent string `schema:"data_content"`
 }
@@ -105,8 +105,8 @@ type PreCreateFileData struct {
 	BlockList  []string `schema:"block_list"`
 	ContentMd5 string   `schema:"content-md5"`
 	SliceMd5   string   `schema:"slice-md5"`
-	LocalCtime string   `schema:"local_ctime"`
-	LocalMtime string   `schema:"local_mtime"`
+	LocalCtime int64    `schema:"local_ctime"`
+	LocalMtime int64    `schema:"local_mtime"`
 }
 
 type FragmentDTO struct {

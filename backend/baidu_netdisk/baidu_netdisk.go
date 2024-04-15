@@ -193,6 +193,7 @@ type Fs struct {
 	VipType      string             // https://developer.microsoft.com/en-us/graph/docs/api-reference/v1.0/resources/drive
 	hashType     hash.Type          // type of the hash we are using
 	api          *api.BaiduApi
+	uk           string
 }
 
 func checkUploadChunkSize(cs fs.SizeSuffix) error {

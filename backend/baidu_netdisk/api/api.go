@@ -196,7 +196,7 @@ func FixToBaiduPathList(rclonePath []string) []string {
 }
 
 // 上传
-func (b *BaiduApi) Precreate(path string, rapidOffsetData RapidOffsetData, preCreateFileData PreCreateFileData) (opts *rest.Opts, err error) {
+func (b *BaiduApi) Precreate(path string, rapidOffsetData *RapidOffsetData, preCreateFileData *PreCreateFileData) (opts *rest.Opts, err error) {
 	encoder := schema.NewEncoder()
 	data := url.Values{}
 	err = encoder.Encode(rapidOffsetData, data)

@@ -2,6 +2,9 @@ package baidu_netdisk
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/backend/baidu_netdisk/api"
@@ -9,6 +12,8 @@ import (
 	"github.com/rclone/rclone/lib/readers"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // GetFileMetas 返回多个文件或文件夹信息（注意是path只能一一对应，并且无法获取到时不会报错，而是返回的info里没有对应的文件或文件夹时errno为-9，外层为0）
@@ -213,9 +218,7 @@ func (f *Fs) MoveOrCopyDirOrFile(ctx context.Context, fileParamList api.FileMana
 	return f.MoveOrCopyDirsOrFiles(ctx, []api.FileManagerParam{fileParamList}, operate)
 }
 
-func (f *Fs) UploadFile(ctx context.Context, in io.Reader, size int64, path string, options ...fs.OpenOption) error{
-
-
+func (f *Fs) UploadFile(ctx context.Context, in io.Reader, size int64, path string, options ...fs.OpenOption) error {
 
 	uploadId := ""
 
@@ -230,8 +233,8 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, size int64, path stri
 		}
 		seg := readers.NewRepeatableReader(io.LimitReader(in, n))
 		fs.Debugf(f, "Uploading segment %d/%d size %d", position, size, n)
-		info, err := f.uploadFragment(ctx, path, uploadId, partSeq, seg, options...)
-		if(info.Md5)
+		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, seg, options...)
+		//if(info.Md5)
 		if err != nil {
 			return nil
 		}
@@ -239,10 +242,78 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, size int64, path stri
 		position += n
 		partSeq += 1
 	}
-
+	return nil
 }
-func (f *Fs) PreCreate(ctx context.Context, path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption){
-	f.api.Precreate()
+
+const uploadBlockSize = 1024 * 1024 * 4
+const sliceSize = 1024 * 256
+const offsetSize = 1024 * 256
+
+func (f *Fs) PreCreate(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
+	reader := readers.NewRepeatableReader(in)
+
+	rapidOffsetData := &api.RapidOffsetData{}
+	preCreateFileData := &api.PreCreateFileData{}
+
+	buffer := make([]byte, uploadBlockSize)
+	// 存储多个 md5 hash 的切片
+	var blockList []string
+	contentHash := md5.New()
+
+	var isFirst = true
+	for {
+		bytesRead, err := reader.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			break
+		}
+		if isFirst {
+			sliceMd5Hash := md5.New()
+			sliceMd5Hash.Write(buffer[:min(bytesRead, sliceSize)])
+			preCreateFileData.SliceMd5 = hex.EncodeToString(sliceMd5Hash.Sum(nil))
+			isFirst = false
+		}
+		uploadBlockHash := md5.New()
+		uploadBlockHash.Write(buffer[:bytesRead])
+		uploadBlockMd5 := uploadBlockHash.Sum(nil)
+		blockList = append(blockList, hex.EncodeToString(uploadBlockMd5)) // 追加每个 4MB 片段的 md5 值到列表
+
+		contentHash.Write(buffer[:bytesRead])
+	}
+
+	contentMd5 := hex.EncodeToString(contentHash.Sum(nil))
+	preCreateFileData.ContentMd5 = contentMd5
+	preCreateFileData.BlockList = blockList
+	preCreateFileData.LocalCtime = src.ModTime(ctx).Unix()
+	preCreateFileData.LocalMtime = src.ModTime(ctx).Unix()
+	preCreateFileData.Size = src.Size()
+
+	nowTime := time.Now().Unix()
+
+	var str = strconv.FormatInt(f.UserId, 10) + contentMd5 + strconv.FormatInt(nowTime, 10)
+	h := md5.New()
+	h.Write([]byte(str))
+	md5Str := hex.EncodeToString(h.Sum(nil))[0:8]
+	result, err := strconv.ParseInt(md5Str, 16, 64)
+	if err != nil {
+		return err
+	}
+	rapidOffsetData.DataOffset = result % (src.Size() - offsetSize + 1)
+	rapidOffsetData.DataTime = nowTime
+	_, err = reader.Seek(rapidOffsetData.DataOffset, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	offsetBuffer := make([]byte, offsetSize)
+	n, err := io.ReadFull(reader, offsetBuffer)
+	if err != nil {
+		return err
+	}
+	// 将读取的数据编码为base64
+	rapidOffsetData.DataContent = base64.StdEncoding.EncodeToString(offsetBuffer[:n])
+	f.api.Precreate(src.Remote(), rapidOffsetData, preCreateFileData)
 }
 
 func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption) (info *api.FragmentDTO, err error) {
@@ -255,5 +326,5 @@ func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, p
 		resp, err := f.unAuth.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
 	})
-	return info,nil
+	return info, nil
 }
