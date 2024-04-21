@@ -207,6 +207,9 @@ func (b *BaiduApi) Precreate(path string, rapidOffsetData *RapidOffsetData, preC
 	if err != nil {
 		return nil, err
 	}
+	if preCreateFileData.BlockList != nil {
+		data.Set("block_list", BodyList(preCreateFileData.BlockList))
+	}
 	data.Add("path", FixToBaiduPath(path))
 	data.Add("isdir", "0")
 	data.Add("autoinit", "1")

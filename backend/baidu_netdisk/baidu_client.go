@@ -12,6 +12,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -92,6 +93,9 @@ func (b *BaiduClient) getDpLogId() string {
 }
 
 func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, request interface{}, response ErrnoResponse, ignoreList []int) (*http.Response, error) {
+	if opts.Parameters == nil {
+		opts.Parameters = make(url.Values)
+	}
 	opts.Parameters.Add("channel", b.Channel)
 	opts.Parameters.Add("web", b.Web)
 	opts.Parameters.Add("app_id", b.AppId)
@@ -103,7 +107,7 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 	opts.Parameters.Add("dp-logid", b.getDpLogId())
 	resp, err := b.Client.CallJSON(ctx, opts, request, response)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
 	if response.GetErrno() != 0 && ignoreList != nil {
@@ -112,7 +116,7 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 				return resp, nil
 			}
 		}
-		return nil, errors.WithStack(fmt.Errorf("response error %d ,resp: %+v ,response body: %+v", response.GetErrno(), resp, response))
+		return resp, errors.WithStack(fmt.Errorf("response error %d ,resp: %+v ,response body: %+v", response.GetErrno(), resp, response))
 	}
 
 	return resp, nil

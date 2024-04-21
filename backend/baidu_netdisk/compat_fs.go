@@ -10,6 +10,7 @@ import (
 	"github.com/rclone/rclone/backend/baidu_netdisk/api"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/lib/readers"
+	"github.com/rclone/rclone/lib/rest"
 	"io"
 	"net/http"
 	"strconv"
@@ -219,7 +220,8 @@ func (f *Fs) MoveOrCopyDirOrFile(ctx context.Context, fileParamList api.FileMana
 }
 
 func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) error {
-	preCreateFileData, preCreateDTO, err := f.PreCreate(ctx, in, localCtime, localMtime, size, path)
+	reader := readers.NewRepeatableReader(in)
+	preCreateFileData, preCreateDTO, err := f.PreCreate(ctx, reader, localCtime, localMtime, size, path)
 	if err != nil {
 		return err
 	}
@@ -235,13 +237,13 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, loc
 	position := int64(0)
 	partSeq := 0
 	for remaining > 0 {
-		n := int64(f.opt.ChunkSize)
+		n := int64(uploadBlockSize)
 		if remaining < n {
 			n = remaining
 		}
-		seg := readers.NewRepeatableReader(io.LimitReader(in, n))
+		seg := readers.NewRepeatableReader(io.LimitReader(reader, n))
 		fs.Debugf(f, "Uploading segment %d/%d size %d", position, size, n)
-		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, seg)
+		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, position, size, seg, n)
 		//if(info.Md5)
 		if err != nil {
 			return nil
@@ -265,11 +267,20 @@ const offsetSize = 1024 * 256
 // PreCreate {"path":"/test/999/111/1234.exe","return_type":1,"block_list":["5910a591dd8fc18c32a8f3df4fdc1761","a5fc157d78e6ad1c7e114b056c92821e"],"errno":0,"request_id":278285463311322051}
 // { "return_type": 2, "errno": 0, "info": { "md5": "5ddc05b01g7f6ae7d6adc90d912c983d", "category": 6, "fs_id": 166064416325948, "request_id": 280244028406040000, "from_type": 1, "size": 112060240, "isdir": 0, "mtime": 1713672326, "ctime": 1713672326, "path": "/test/999/111/1234_20240421_120525.exe" }, "request_id": 280244028406040573 }
 // return_type 1 无法秒传，准备上传 2 秒传成功 3 文件已存在（仅一刻相册，在百度网盘中只会返回2）
-func (f *Fs) PreCreate(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) (preCreateFileData *api.PreCreateFileData, info *api.PreCreateDTO, err error) {
-	reader := readers.NewRepeatableReader(in)
+func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, localCtime int64, localMtime int64, size int64, path string) (preCreateFileData *api.PreCreateFileData, info *api.PreCreateDTO, err error) {
+	//reader := readers.NewRepeatableReader(in)
+	_, err = reader.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func(reader *readers.RepeatableReader, offset int64, whence int) {
+		_, err := reader.Seek(offset, whence)
+		if err != nil {
+		}
+	}(reader, 0, io.SeekStart)
 
 	rapidOffsetData := &api.RapidOffsetData{}
-	//preCreateFileData := &api.PreCreateFileData{}
+	preCreateFileData = &api.PreCreateFileData{}
 
 	buffer := make([]byte, uploadBlockSize)
 	// 存储多个 md5 hash 的切片
@@ -342,14 +353,22 @@ func (f *Fs) PreCreate(ctx context.Context, in io.Reader, localCtime int64, loca
 	return preCreateFileData, info, err
 }
 
-func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption) (info *api.FragmentDTO, err error) {
+func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, start int64, totalSize int64, chunk io.ReadSeeker, chunkSize int64, options ...fs.OpenOption) (info *api.FragmentDTO, err error) {
+	var skip = int64(0)
+	_, _ = chunk.Seek(skip, io.SeekStart)
 	opts, err := f.api.Superfile2(path, uploadId, partseq, chunk, options...)
 	if err != nil {
 		return nil, err
 	}
+	toSend := chunkSize - skip
+	opts.ContentLength = &toSend
+	opts.ContentRange = fmt.Sprintf("bytes %d-%d/%d", start+skip, start+chunkSize-1, totalSize)
+
 	info = new(api.FragmentDTO)
 	err = f.pacer.Call(func() (bool, error) {
-		resp, err := f.unAuth.CallJSON(ctx, opts, nil, info)
+		resp, err := f.unAuth.Call(ctx, opts)
+		body, err := rest.ReadBody(resp)
+		fmt.Println(string(body))
 		return shouldRetry(ctx, resp, err)
 	})
 	return info, err

@@ -1,5 +1,7 @@
 package api
 
+import "github.com/rclone/rclone/fs"
+
 type BaseBaiduResponse struct {
 	Errno     int   `json:"errno"`
 	RequestId int64 `json:"request_id"`
@@ -106,7 +108,7 @@ type RapidOffsetData struct {
 
 type PreCreateFileData struct {
 	Size       int64    `schema:"size"`
-	BlockList  []string `schema:"block_list"`
+	BlockList  []string `schema:"-"`
 	ContentMd5 string   `schema:"content-md5"`
 	SliceMd5   string   `schema:"slice-md5"`
 	LocalCtime int64    `schema:"local_ctime"`
@@ -120,14 +122,17 @@ type FragmentDTO struct {
 	UploadId  int32  `json:"uploadid"`
 }
 
+func (b FragmentDTO) GetErrno() int {
+	return 0
+}
+
 type PreCreateDTO struct {
 	BaseBaiduResponse
-	Path       string   `json:"path"` //return_type为1时 才会有这一项
-	ReturnType int      `json:"return_type"`
-	BlockList  []string `json:"block_list"` //return_type为1时 才会有这一项
-	Info       Item     `json:"info"`       //return_type为2时 才会有这一项
-	UploadId   string   `json:"uploadid"`   //return_type为1时 才会有这一项
-
+	Path       string           `json:"path"` //return_type为1时 才会有这一项
+	ReturnType int              `json:"return_type"`
+	BlockList  []fs.StringValue `json:"block_list"` //return_type为1时 才会有这一项
+	Info       Item             `json:"info"`       //return_type为2时 才会有这一项
+	UploadId   string           `json:"uploadid"`   //return_type为1时 才会有这一项
 }
 
 type CreateDTO struct {
