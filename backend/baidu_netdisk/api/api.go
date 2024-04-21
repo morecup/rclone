@@ -238,7 +238,7 @@ func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, chunk i
 }
 
 // 上传
-func (b *BaiduApi) Create(path string, preCreateFileData PreCreateFileData, uploadId string) (opts *rest.Opts, err error) {
+func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, uploadId string) (opts *rest.Opts, err error) {
 	encoder := schema.NewEncoder()
 	data := url.Values{}
 	err = encoder.Encode(preCreateFileData, data)

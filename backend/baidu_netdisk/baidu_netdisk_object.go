@@ -101,8 +101,8 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 //
 // The new object may have been created if an error is returned
 func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
-
-	return nil
+	err = o.fs.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), o.fs.ToAbsolutePath(src.Remote()))
+	return err
 }
 
 // Remove an object

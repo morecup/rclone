@@ -1,13 +1,17 @@
 package api
 
-type BaiduResponse struct {
-	Errno     int    `json:"errno"`
-	RequestId int64  `json:"request_id"`
-	GuidInf   string `json:"guid_inf"`
-	Guid      int64  `json:"guid"`
+type BaseBaiduResponse struct {
+	Errno     int   `json:"errno"`
+	RequestId int64 `json:"request_id"`
 }
 
-func (b BaiduResponse) GetErrno() int {
+type BaiduResponse struct {
+	BaseBaiduResponse
+	GuidInf string `json:"guid_inf"`
+	Guid    int64  `json:"guid"`
+}
+
+func (b BaseBaiduResponse) GetErrno() int {
 	return b.Errno
 }
 
@@ -114,4 +118,28 @@ type FragmentDTO struct {
 	Partseq   string `json:"partseq"`
 	RequestId int64  `json:"request_id"`
 	UploadId  int32  `json:"uploadid"`
+}
+
+type PreCreateDTO struct {
+	BaseBaiduResponse
+	Path       string   `json:"path"` //return_type为1时 才会有这一项
+	ReturnType int      `json:"return_type"`
+	BlockList  []string `json:"block_list"` //return_type为1时 才会有这一项
+	Info       Item     `json:"info"`       //return_type为2时 才会有这一项
+	UploadId   string   `json:"uploadid"`   //return_type为1时 才会有这一项
+
+}
+
+type CreateDTO struct {
+	BaseBaiduResponse
+	Ctime    int    `json:"ctime"`
+	FromType int    `json:"from_type"`
+	FsId     int64  `json:"fs_id"`
+	Isdir    int    `json:"isdir"`
+	Md5      string `json:"md5"`
+	Mtime    int    `json:"mtime"`
+	Path     string `json:"path"`
+	Size     int    `json:"size"`
+	Name     string `json:"name"`
+	Category int    `json:"category"`
 }
