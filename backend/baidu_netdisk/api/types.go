@@ -100,10 +100,10 @@ type FileManagerParam struct {
 }
 
 type RapidOffsetData struct {
-	DataTime int64 `schema:"data_time"`
-	//DataLength  int    `schema:"data_length"`
-	DataOffset  int64  `schema:"data_offset"`
-	DataContent string `schema:"data_content"`
+	DataTime int64 `schema:"data_time,omitempty"`
+	//DataLength  int    `schema:"data_length,omitempty"`
+	DataOffset  int64  `schema:"data_offset,omitempty"`
+	DataContent string `schema:"data_content,omitempty"`
 }
 
 type PreCreateFileData struct {
@@ -115,18 +115,18 @@ type PreCreateFileData struct {
 	LocalMtime int64    `schema:"local_mtime"`
 }
 
-type FragmentDTO struct {
+type FragmentVO struct {
 	Md5       string `json:"md5"`
 	Partseq   string `json:"partseq"`
 	RequestId int64  `json:"request_id"`
 	UploadId  int32  `json:"uploadid"`
 }
 
-func (b FragmentDTO) GetErrno() int {
+func (b FragmentVO) GetErrno() int {
 	return 0
 }
 
-type PreCreateDTO struct {
+type PreCreateVO struct {
 	BaseBaiduResponse
 	Path       string           `json:"path"` //return_type为1时 才会有这一项
 	ReturnType int              `json:"return_type"`
@@ -135,7 +135,7 @@ type PreCreateDTO struct {
 	UploadId   string           `json:"uploadid"`   //return_type为1时 才会有这一项
 }
 
-type CreateDTO struct {
+type CreateVO struct {
 	BaseBaiduResponse
 	Ctime    int    `json:"ctime"`
 	FromType int    `json:"from_type"`
@@ -147,4 +147,22 @@ type CreateDTO struct {
 	Size     int    `json:"size"`
 	Name     string `json:"name"`
 	Category int    `json:"category"`
+}
+
+type LocateDownloadVO struct {
+	ClientIP string `json:"client_ip"`
+	URLs     []struct {
+		URL  string `json:"url"`
+		Rank int    `json:"rank"`
+	} `json:"urls"`
+	BakURLs   string `json:"bakurls"`
+	RankParam struct {
+		MaxContinuousFailure int `json:"max_continuous_failure"`
+		BakRankSliceNum      int `json:"bak_rank_slice_num"`
+	} `json:"rank_param"`
+	FSL        int   `json:"fsl"`
+	MaxTimeout int   `json:"max_timeout"`
+	MinTimeout int   `json:"min_timeout"`
+	IV         int   `json:"iv"`
+	RequestID  int64 `json:"request_id"`
 }

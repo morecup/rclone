@@ -93,19 +93,7 @@ func (b *BaiduClient) getDpLogId() string {
 }
 
 func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, request interface{}, response ErrnoResponse, ignoreList []int) (*http.Response, error) {
-	if opts.Parameters == nil {
-		opts.Parameters = make(url.Values)
-	}
-	opts.Parameters.Add("channel", b.Channel)
-	opts.Parameters.Add("web", b.Web)
-	opts.Parameters.Add("app_id", b.AppId)
-	if b.Bdstoken != "" {
-		opts.Parameters.Add("bdstoken", b.Bdstoken)
-	}
-	opts.Parameters.Add("logid", b.LogId)
-	opts.Parameters.Add("clienttype", b.ClientType)
-	opts.Parameters.Add("dp-logid", b.getDpLogId())
-	resp, err := b.Client.CallJSON(ctx, opts, request, response)
+	resp, err := b.Client.CallJSON(ctx, b.AddParam(opts), request, response)
 	if err != nil {
 		return resp, err
 	}
@@ -124,6 +112,32 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 
 func (b *BaiduClient) CallJSON(ctx context.Context, opts *rest.Opts, request interface{}, response ErrnoResponse) (*http.Response, error) {
 	return b.CallJSONIgnore(ctx, opts, request, response, []int{})
+}
+func (b *BaiduClient) CallJSONBase(ctx context.Context, opts *rest.Opts, request interface{}, response interface{}) (*http.Response, error) {
+	return b.Client.CallJSON(ctx, b.AddParam(opts), request, response)
+}
+
+func (b *BaiduClient) Call(ctx context.Context, opts *rest.Opts) (*http.Response, error) {
+	res, err := b.Client.Call(ctx, b.AddParam(opts))
+	return res, err
+}
+
+func (b *BaiduClient) AddParam(opts *rest.Opts) *rest.Opts {
+	if opts.Parameters == nil {
+		opts.Parameters = make(url.Values)
+	}
+	opts.Parameters.Add("app_id", b.AppId)
+	if strings.Contains(opts.RootURL, "pan.baidu.com") {
+		opts.Parameters.Add("channel", b.Channel)
+		opts.Parameters.Add("web", b.Web)
+		if b.Bdstoken != "" {
+			opts.Parameters.Add("bdstoken", b.Bdstoken)
+		}
+		opts.Parameters.Add("logid", b.LogId)
+		opts.Parameters.Add("clienttype", b.ClientType)
+		opts.Parameters.Add("dp-logid", b.getDpLogId())
+	}
+	return opts
 }
 
 func shouldRetry(ctx context.Context, resp *http.Response, err error) (bool, error) {

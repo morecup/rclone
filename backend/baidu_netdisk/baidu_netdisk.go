@@ -2,6 +2,7 @@ package baidu_netdisk
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/backend/baidu_netdisk/api"
@@ -273,7 +274,10 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 
 	transport := client.Transport.(*fshttp.Transport)
-	transport.SetUserAgent("netdisk;2.2.51.6;netdisk;10.0.63;PC;android-android")
+	//netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia
+	//netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;
+	transport.SetUserAgent("netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia")
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	f := &Fs{
 		name:     name,
 		root:     root,
@@ -491,7 +495,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	srcObj, ok := src.(*Object)
 	if ok {
 		//need to sure same account
-		if srcObj.fs.UserId == 0 || f.UserId == 0 || srcObj.fs.UserId == f.UserId {
+		if srcObj.fs.UserId == 0 || f.UserId == 0 || srcObj.fs.UserId != f.UserId {
 			fs.Debugf(f, "Can't move files between drives (%q != %q)", srcObj.fs.UserId, srcObj.fs.UserId)
 			return nil, fs.ErrorCantMove
 		}
@@ -540,7 +544,7 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 	srcFs, ok := src.(*Fs)
 	if ok {
 		//need to sure same account
-		if srcFs.UserId == 0 || f.UserId == 0 || srcFs.UserId == f.UserId {
+		if srcFs.UserId == 0 || f.UserId == 0 || srcFs.UserId != f.UserId {
 			fs.Debugf(f, "Can't move files between drives (%q != %q)", srcFs.UserId, f.UserId)
 			return fs.ErrorCantDirMove
 		}

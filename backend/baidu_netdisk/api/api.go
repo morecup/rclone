@@ -1,14 +1,17 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/gorilla/schema"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/lib/rest"
 	"io"
+	"math/rand"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type BaiduApi struct {
@@ -82,6 +85,21 @@ func (b *BaiduApi) DownFileDisguiseBaiduClient(dLink string) (opts *rest.Opts, e
 		Method:  "GET",
 		RootURL: dLink,
 		//ExtraHeaders: map[string]string{"User-Agent": "pan.baidu.com"},
+	}
+	return opts, nil
+}
+
+// Disguise as a Baidu client.can down all file but will be limit speed.
+func (b *BaiduApi) GetLocateDownloadUrl(path string) (opts *rest.Opts, err error) {
+	opts = &rest.Opts{
+		Method:  "POST",
+		RootURL: "https://d.pcs.baidu.com",
+		Path:    "/rest/2.0/pcs/file",
+		Parameters: url.Values{
+			"method": []string{"locatedownload"},
+			"path":   []string{FixToBaiduPath(path)},
+		},
+		ContentType: "application/x-www-form-urlencoded",
 	}
 	return opts, nil
 }
@@ -223,10 +241,26 @@ func (b *BaiduApi) Precreate(path string, rapidOffsetData *RapidOffsetData, preC
 	}
 	return opts, nil
 }
-func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, chunk io.ReadSeeker, options ...fs.OpenOption) (opts *rest.Opts, err error) {
+func generateRandomNumberString() string {
+	rand.Seed(time.Now().UnixNano())
+
+	firstNum := rand.Intn(9) + 1 // 生成一个 1 到 9 的随机整数
+	randomString := strconv.Itoa(firstNum)
+
+	for i := 0; i < 28; i++ {
+		randomString += strconv.Itoa(rand.Intn(10)) // 生成一个 0 到 9 的随机整数
+	}
+
+	return randomString
+}
+func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, realChunkSize int64, chunk io.Reader, options ...fs.OpenOption) (opts *rest.Opts, err error) {
+	randNumber := generateRandomNumberString()
+	beginByte := []byte("-----------------------------" + randNumber + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"blob\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+	endByte := []byte("\r\n-----------------------------" + randNumber + "--\r\n")
+	bodyLen := int64(len(beginByte)) + realChunkSize + int64(len(endByte))
 	opts = &rest.Opts{
 		Method:  "POST",
-		RootURL: "https://d.pcs.baidu.com/rest/2.0/pcs/file",
+		RootURL: "https://d.pcs.baidu.com/rest/2.0/pcs/superfile2",
 		Parameters: url.Values{
 			"method":   []string{"upload"},
 			"type":     []string{"tmpfile"},
@@ -234,8 +268,14 @@ func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, chunk i
 			"uploadid": []string{uploadId},
 			"partseq":  []string{strconv.Itoa(partseq)},
 		},
-		Body:    chunk,
-		Options: options,
+		Body: io.MultiReader(
+			bytes.NewReader(beginByte),
+			chunk,
+			bytes.NewReader(endByte)),
+		Options:     options,
+		ContentType: "multipart/form-data; boundary=---------------------------" + randNumber,
+		//TransferEncoding: []string{"identity"},
+		ContentLength: &bodyLen,
 	}
 	return opts, nil
 }
@@ -247,6 +287,9 @@ func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, upl
 	err = encoder.Encode(preCreateFileData, data)
 	if err != nil {
 		return nil, err
+	}
+	if preCreateFileData.BlockList != nil {
+		data.Set("block_list", BodyList(preCreateFileData.BlockList))
 	}
 	data.Add("path", FixToBaiduPath(path))
 	data.Add("isdir", "0")

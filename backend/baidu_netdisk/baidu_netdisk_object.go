@@ -78,7 +78,7 @@ func (o *Object) Storable() bool {
 }
 
 // Open an object for read
-func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
+func (o *Object) OpenOld(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
 	if o.remote == "" {
 		return nil, errors.New("can't download - no id")
 	}
@@ -95,6 +95,16 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 		o.size = resp.ContentLength
 	}
 	return resp.Body, err
+}
+func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
+	if o.remote == "" {
+		return nil, errors.New("can't download - no id")
+	}
+	if o.isOneNoteFile {
+		return nil, errors.New("can't open a OneNote file")
+	}
+	fs.FixRangeOption(options, o.size)
+	return o.fs.DownFileSe(ctx, o.remote, o.size, options)
 }
 
 // Update the object with the contents of the io.Reader, modTime and size
