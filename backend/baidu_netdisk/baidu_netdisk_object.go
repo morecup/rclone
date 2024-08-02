@@ -97,6 +97,12 @@ func (o *Object) OpenOld(ctx context.Context, options ...fs.OpenOption) (in io.R
 	return resp.Body, err
 }
 func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
+	//或者，使用 bytes.NewReader 创建一个空的读取器
+	//reader := bytes.NewReader([]byte(strings.Repeat("1", int(o.size))))
+	//
+	//使用 ioutil.NopCloser 将 buf 包装成一个 io.ReadCloser
+	//readCloser1 := ioutil.NopCloser(reader)
+	//return readCloser1, nil
 	if o.remote == "" {
 		return nil, errors.New("can't download - no id")
 	}
@@ -104,7 +110,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 		return nil, errors.New("can't open a OneNote file")
 	}
 	fs.FixRangeOption(options, o.size)
-	return o.fs.DownFileSe(ctx, o.remote, o.size, options)
+	return o.fs.DownFileSerial(ctx, o.remote, o.size, options)
 }
 
 // Update the object with the contents of the io.Reader, modTime and size

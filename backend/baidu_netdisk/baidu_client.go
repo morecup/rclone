@@ -168,6 +168,11 @@ func shouldRetry(ctx context.Context, resp *http.Response, err error) (bool, err
 					fs.Debugf(nil, "Too many requests. Trying again in %d seconds.", retryAfter)
 				}
 			}
+		case 403:
+			duration := time.Second * time.Duration(1)
+			retry = true
+			err = pacer.RetryAfterError(err, duration)
+			fs.Debugf(nil, "Should retry: %v", err)
 		case 507: // Insufficient Storage
 			return false, fserrors.FatalError(err)
 		}

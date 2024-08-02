@@ -277,6 +277,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	//netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia
 	//netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;
 	transport.SetUserAgent("netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia")
+	//transport.SetUserAgent("netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;")
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	f := &Fs{
 		name:     name,

@@ -12,6 +12,7 @@ import (
 	"github.com/rclone/rclone/lib/readers"
 	"github.com/rclone/rclone/lib/rest"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -81,6 +82,7 @@ func (m *multiReadCloser) Close() (err error) {
 	return
 }
 
+// 有多少切片就开多少线程去下载
 func (f *Fs) DownFile(ctx context.Context, path string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
 	downUrl, err := f.GetDownUrl(ctx, path)
 	if err != nil {
@@ -153,6 +155,7 @@ type TaskResult struct {
 
 var sliceMaxLen = int64(327680)
 
+// 固定线程去下载
 func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
 	downUrl, err := f.GetDownUrl(ctx, path)
 	if err != nil {
@@ -178,11 +181,12 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 		go func(b int64, e int64, index int) {
 			defer wg.Done() // goroutine 完成后计数减一
 			sem <- struct{}{}
-			resp, err := f.DownFileBySlice(ctx, downUrl, b, e)
+			resp, err1 := f.DownFileBySlice(ctx, downUrl, b, e)
+			log.Printf("任务1 taskResult: %v", resp)
 			done <- TaskResult{
 				taskId: index,
 				resp:   resp,
-				err:    err,
+				err:    err1,
 			}
 			<-sem
 		}(beginIndex, endIndex, i) // 注意这里将参数传进协程
@@ -198,6 +202,8 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 		for taskResult := range done {
 			if taskResult.resp != nil {
 				responses[taskResult.taskId] = taskResult.resp
+			} else if taskResult.err != nil {
+				log.Printf("任务err #%d taskResult: %v", taskResult.taskId, taskResult)
 			}
 		}
 	}()
@@ -218,6 +224,8 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 	}
 	return multi, nil
 }
+
+// 串行执行
 func (f *Fs) DownFileSerial(ctx context.Context, path string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
 	downUrl, err := f.GetDownUrl(ctx, path)
 	if err != nil {
