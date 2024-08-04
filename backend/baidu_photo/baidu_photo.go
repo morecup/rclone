@@ -1,11 +1,11 @@
-package baidu_netdisk
+package baidu_photo
 
 import (
 	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/rclone/rclone/backend/baidu_netdisk/api"
+	"github.com/rclone/rclone/backend/baidu_photo/api"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/configstruct"
@@ -35,7 +35,10 @@ const (
 )
 
 // Globals
-var ()
+var (
+	scopeAccess      = fs.SpaceSepList{"Files.Read", "Files.ReadWrite", "Files.Read.All", "Files.ReadWrite.All", "Sites.Read.All", "offline_access"}
+	QuickXorHashType hash.Type
+)
 
 // Register with Fs
 func init() {
@@ -129,7 +132,7 @@ type Fs struct {
 	opt          Options            // parsed options
 	ci           *fs.ConfigInfo     // global config
 	features     *fs.Features       // optional features
-	srv          *rest.Client       // the connection to the OneDrive server
+	srv          *BaiduClient       // the connection to the OneDrive server
 	unAuth       *rest.Client       // no authentication connection to the OneDrive server
 	dirCache     *dircache.DirCache // Map of directory path to directory id
 	pacer        *fs.Pacer          // pacer for API calls
@@ -171,7 +174,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, err
 	}
 
-	rootURL := "https://pan.baidu.com"
+	rootURL := "https://photo.baidu.com"
 
 	client := fshttp.NewClient(ctx)
 	cookieJar, _ := persistjar.New(&persistjar.Options{PublicSuffixList: publicsuffix.List}, m, "")
@@ -194,16 +197,17 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	transport.SetUserAgent("netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia")
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	f := &Fs{
-		name:    name,
-		root:    root,
-		opt:     *opt,
-		ci:      ci,
-		UserId:  opt.UserID,
-		VipType: opt.VipType,
-		srv:     rest.NewClient(client).SetRoot(rootURL),
-		unAuth:  rest.NewClient(client),
-		pacer:   fs.NewPacer(ctx, pacer.NewDefault(pacer.MinSleep(minSleep), pacer.MaxSleep(maxSleep), pacer.DecayConstant(decayConstant))),
-		api:     &api.BaiduApi{},
+		name:     name,
+		root:     root,
+		opt:      *opt,
+		ci:       ci,
+		UserId:   opt.UserID,
+		VipType:  opt.VipType,
+		srv:      NewBaiduClient(rest.NewClient(client).SetRoot(rootURL), value),
+		unAuth:   rest.NewClient(client),
+		pacer:    fs.NewPacer(ctx, pacer.NewDefault(pacer.MinSleep(minSleep), pacer.MaxSleep(maxSleep), pacer.DecayConstant(decayConstant))),
+		hashType: QuickXorHashType,
+		api:      &api.BaiduApi{},
 	}
 	f.features = (&fs.Features{
 		CaseInsensitive:         false,
@@ -211,15 +215,19 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		CanHaveEmptyDirectories: true,
 		ServerSideAcrossConfigs: opt.ServerSideAcrossConfigs,
 	}).Fill(ctx, f)
-	f.srv.SetErrorHandler(errorHandler)
+	f.srv.Client.SetErrorHandler(errorHandler)
 
-	templateInfo, err := f.GetUserInfo(ctx)
+	userInfo, err := f.GetUserInfo(ctx)
 
 	if err != nil {
 		return nil, err
 	}
-	f.srv.Bdstoken = templateInfo.Bdstoken
-	f.UserId = templateInfo.Uk
+	//f.srv.Bdstoken = userInfo.Bdstoken
+	userId, err := strconv.ParseInt(userInfo.YouaId, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	f.UserId = userId
 	m.Set("UserId", strconv.FormatInt(f.UserId, 10))
 
 	// Set the user defined hash
@@ -231,24 +239,26 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, err
 	}
 
-	//if root is file path,fix root to dir path
-	item, _, err := f.GetFileMeta(ctx, "/"+f.root, false, false)
-	if err != nil {
-		return nil, err
-	}
-	if item.IsDir == 0 {
-		dir, _ := SplitPath(f.root)
-		item, _, err = f.GetFileMeta(ctx, "/"+dir, false, false)
+	/*
+		//if root is file path,fix root to dir path
+		item, _, err := f.GetFileMeta(ctx, "/"+f.root, false, false)
 		if err != nil {
 			return nil, err
 		}
 		if item.IsDir == 0 {
-			return nil, fmt.Errorf("path is not a right path.root:(%s)", f.root)
-		} else {
-			f.root = dir
-			return f, fs.ErrorIsFile
+			dir, _ := SplitPath(f.root)
+			item, _, err = f.GetFileMeta(ctx, "/"+dir, false, false)
+			if err != nil {
+				return nil, err
+			}
+			if item.IsDir == 0 {
+				return nil, fmt.Errorf("path is not a right path.root:(%s)", f.root)
+			} else {
+				f.root = dir
+				return f, fs.ErrorIsFile
+			}
 		}
-	}
+	*/
 	return f, nil
 }
 
@@ -294,8 +304,7 @@ func (f *Fs) CreateDir(ctx context.Context, pathID, leaf string) (newID string, 
 
 // List entries normal need to implement fs.Directory or fs.Object ,dir is relative path.
 func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err error) {
-	absolutePath := f.ToAbsolutePath(dir)
-	itemList, err := f.ListDirAllFiles(ctx, absolutePath)
+	itemList, err := f.ListDirAllFiles(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -505,20 +514,16 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 	if dir != "" {
 		dir = dir + "/"
 	}
-	if info.IsDir == 1 {
-		entry = fs.NewDir(dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(info.FsID)).SetItems(-1).SetSize(-1)
-	} else if info.IsDir == 0 {
-		entry = &Object{
-			fs:            f,
-			remote:        dir + info.ServerFilename,
-			hasMetaData:   true,
-			isOneNoteFile: false,
-			size:          info.Size,
-			modTime:       time.Unix(info.LocalMtime, 0),
-			id:            strconv.Itoa(info.FsID),
-			hash:          "md5",
-			mimeType:      "json",
-		}
+	entry = &Object{
+		fs:            f,
+		remote:        path.Base(info.Path),
+		hasMetaData:   true,
+		isOneNoteFile: false,
+		size:          info.Size,
+		modTime:       time.Unix(info.ShootTime, 0),
+		id:            strconv.FormatInt(info.FsID, 10),
+		hash:          "md5",
+		mimeType:      "json",
 	}
 
 	return entry, nil
