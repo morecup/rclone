@@ -78,16 +78,13 @@ func (b *BaiduApi) DownFileDisguiseBaiduClient(dLink string) (opts *rest.Opts, e
 }
 
 // Disguise as a Baidu client.can down all file but will be limit speed.
-func (b *BaiduApi) GetLocateDownloadUrl(path string) (opts *rest.Opts, err error) {
+func (b *BaiduApi) GetDownloadUrl(fsid string) (opts *rest.Opts, err error) {
 	opts = &rest.Opts{
-		Method:  "POST",
-		RootURL: "https://d.pcs.baidu.com",
-		Path:    "/rest/2.0/pcs/file",
+		Method: "GET",
+		Path:   "/youai/file/v2/download",
 		Parameters: url.Values{
-			"method": []string{"locatedownload"},
-			"path":   []string{FixToBaiduPath(path)},
+			"fsid": []string{fsid},
 		},
-		ContentType: "application/x-www-form-urlencoded",
 	}
 	return opts, nil
 }
@@ -111,21 +108,14 @@ func (b *BaiduApi) CreateDir(path string, isdir bool) (opts *rest.Opts, err erro
 	return opts, nil
 }
 
-func (b *BaiduApi) DeleteDirsOrFiles(fileList []string, async int) (opts *rest.Opts, err error) {
+func (b *BaiduApi) DeleteDirsOrFiles(fileList []string) (opts *rest.Opts, err error) {
 	data := url.Values{}
 	data.Add("filelist", BodyList(FixToBaiduPathList(fileList)))
 
 	opts = &rest.Opts{
-		Method: "POST",
-		Path:   "/api/filemanager",
-		Parameters: url.Values{
-			"async":     []string{strconv.Itoa(async)},
-			"onnest":    []string{"fail"},
-			"opera":     []string{"delete"},
-			"newVerify": []string{"1"},
-		},
-		ContentType: "application/x-www-form-urlencoded",
-		Body:        strings.NewReader(data.Encode()),
+		Method:     "GET",
+		Path:       "/youai/file/v1/delete",
+		Parameters: data,
 	}
 	return opts, nil
 }
@@ -220,10 +210,11 @@ func (b *BaiduApi) Precreate(path string, rapidOffsetData *RapidOffsetData, preC
 	data.Add("isdir", "0")
 	data.Add("autoinit", "1")
 	data.Add("rtype", "1")
+	data.Add("ctype", "11")
 
 	opts = &rest.Opts{
 		Method:      "POST",
-		Path:        "/api/precreate",
+		Path:        "/youai/file/v1/precreate",
 		ContentType: "application/x-www-form-urlencoded",
 		Body:        strings.NewReader(data.Encode()),
 	}
@@ -255,6 +246,7 @@ func (b *BaiduApi) Superfile2(path string, uploadId string, partseq int, realChu
 			"path":     []string{FixToBaiduPath(path)},
 			"uploadid": []string{uploadId},
 			"partseq":  []string{strconv.Itoa(partseq)},
+			"app_id":   []string{"16051585"},
 		},
 		Body: io.MultiReader(
 			bytes.NewReader(beginByte),
@@ -283,10 +275,11 @@ func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, upl
 	data.Add("isdir", "0")
 	data.Add("uploadid", uploadId)
 	data.Add("rtype", "1")
+	data.Add("ctype", "11")
 
 	opts = &rest.Opts{
 		Method:      "POST",
-		Path:        "/api/create",
+		Path:        "/youai/file/v1/create",
 		ContentType: "application/x-www-form-urlencoded",
 		Body:        strings.NewReader(data.Encode()),
 	}

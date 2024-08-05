@@ -74,6 +74,10 @@ func (api *Client) SetRoot(RootURL string) *Client {
 	return api
 }
 
+func (api *Client) GetRoot() string {
+	return api.rootURL
+}
+
 // SetHeader sets a header for all requests
 // Start the key with "*" for don't canonicalise
 func (api *Client) SetHeader(key, value string) *Client {

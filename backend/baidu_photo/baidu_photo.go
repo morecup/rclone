@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,17 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		bodyString := string(bodyBytes)
 		fmt.Println(bodyString)
+		//{bdstoken: '5652a36cd9ea59b34d59d81c7462f8c8', uk: '1102385300722'}
+		re := regexp.MustCompile(`bdstoken:\s*'([^']*)'`)
+		// 使用正则表达式查找匹配项
+		match := re.FindStringSubmatch(bodyString)
+		// 检查是否找到匹配项，并获取bdstoken的值
+		if len(match) > 1 {
+			bdstoken := match[1] // 第一个匹配的分组
+			m.Set("bdstoken", bdstoken)
+		} else {
+			m.Set("bdstoken", "")
+		}
 		nowCookies := cookieJar.Cookies(cookieURL)
 		for _, cookie := range nowCookies {
 			if cookie.Name == "BDUSS" {
@@ -222,13 +234,17 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	if err != nil {
 		return nil, err
 	}
-	//f.srv.Bdstoken = userInfo.Bdstoken
 	userId, err := strconv.ParseInt(userInfo.YouaId, 10, 64)
 	if err != nil {
 		return nil, err
 	}
 	f.UserId = userId
 	m.Set("UserId", strconv.FormatInt(f.UserId, 10))
+
+	bdstoken, ok := m.Get("bdstoken")
+	if ok {
+		f.srv.Bdstoken = bdstoken
+	}
 
 	// Set the user defined hash
 	if opt.HashType == "auto" || opt.HashType == "" {
@@ -321,7 +337,7 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 // NewObject finds the Object at remote.  If it can't be found
 // it returns the error fs.ErrorObjectNotFound.
 func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
-	item, _, err := f.GetFileMeta(ctx, f.ToAbsolutePath(remote), true, true)
+	item, err := f.GetFileMeta(ctx, f.ToAbsolutePath(remote))
 	if err != nil {
 		return nil, err
 	}
@@ -370,13 +386,20 @@ func (f *Fs) buildObject(ctx context.Context, remote string, modTime time.Time, 
 }
 
 func (f *Fs) Mkdir(ctx context.Context, dir string) error {
+	return errors.New("不支持创建文件夹")
+	/**
 	err := f.CreateDirForce(ctx, f.ToAbsolutePath(dir))
 	return err
+
+	*/
 }
 
 func (f *Fs) Rmdir(ctx context.Context, dir string) error {
+	return errors.New("不支持删除文件")
+	/**
 	err := f.DeleteDirOrFile(ctx, f.ToAbsolutePath(dir))
 	return err
+	*/
 }
 
 // Move src to this remote using server-side move operations.

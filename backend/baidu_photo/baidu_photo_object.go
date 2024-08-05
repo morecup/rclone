@@ -110,7 +110,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 		return nil, errors.New("can't open a OneNote file")
 	}
 	fs.FixRangeOption(options, o.size)
-	return o.fs.DownFileSerial(ctx, o.remote, o.size, options)
+	return o.fs.DownFileSerial(ctx, o.id, o.size, options)
 }
 
 // Update the object with the contents of the io.Reader, modTime and size

@@ -166,32 +166,27 @@ type PreCreateVO struct {
 
 type CreateVO struct {
 	BaseBaiduResponse
-	Ctime    int    `json:"ctime"`
-	FromType int    `json:"from_type"`
-	FsId     int64  `json:"fs_id"`
-	Isdir    int    `json:"isdir"`
-	Md5      string `json:"md5"`
-	Mtime    int    `json:"mtime"`
-	Path     string `json:"path"`
-	Size     int    `json:"size"`
-	Name     string `json:"name"`
-	Category int    `json:"category"`
+	ReturnType int       `json:"return_type"`
+	Data       *BaseItem `json:"data"`
 }
 
-type LocateDownloadVO struct {
-	ClientIP string `json:"client_ip"`
-	URLs     []struct {
-		URL  string `json:"url"`
-		Rank int    `json:"rank"`
-	} `json:"urls"`
-	BakURLs   string `json:"bakurls"`
-	RankParam struct {
-		MaxContinuousFailure int `json:"max_continuous_failure"`
-		BakRankSliceNum      int `json:"bak_rank_slice_num"`
-	} `json:"rank_param"`
-	FSL        int   `json:"fsl"`
-	MaxTimeout int   `json:"max_timeout"`
-	MinTimeout int   `json:"min_timeout"`
-	IV         int   `json:"iv"`
-	RequestID  int64 `json:"request_id"`
+type BaseItem struct {
+	FsID           int64  `json:"fs_id"`
+	Path           string `json:"path"`
+	Md5            string `json:"md5"`
+	FromType       string `json:"from_type"`
+	ServerMd5      string `json:"server_md5"`
+	Size           int64  `json:"size"`
+	Category       int    `json:"category"`
+	ShootTime      int64  `json:"shoot_time"`
+	Ctime          int64  `json:"ctime"`
+	Mtime          int64  `json:"mtime"`
+	Errno          int32  `json:"errno"`
+	IsDir          int32  `json:"isdir"`
+	ServerFilename string `json:"server_filename"`
+}
+
+type DownloadVO struct {
+	BaseBaiduResponse
+	Dlink string `json:"dlink"`
 }

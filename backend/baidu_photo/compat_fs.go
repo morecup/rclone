@@ -14,6 +14,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -37,19 +38,23 @@ func (f *Fs) GetFileMetas(ctx context.Context, path []string, needDownLink bool,
 }
 
 // GetFileMeta 返回单个文件或文件夹信息，经过处理
-func (f *Fs) GetFileMeta(ctx context.Context, path string, needDownLink bool, needTextLink bool) (item *api.Item, resp *http.Response, err error) {
-	itemList, resp, err := f.GetFileMetas(ctx, []string{path}, needDownLink, needTextLink)
-	item = itemList[0]
+func (f *Fs) GetFileMeta(ctx context.Context, filePath string) (item *api.Item, err error) {
+	itemList, err := f.ListDirAllFiles(ctx)
 	if err != nil {
-		if item.Errno == -9 {
-			return item, resp, fs.ErrorObjectNotFound
+		return nil, err
+	}
+	fileBasePath := path.Base(filePath)
+	for _, itemR := range itemList {
+		remoteFileBasePath := path.Base(itemR.Path)
+		if fileBasePath == remoteFileBasePath {
+			return itemR, nil
 		}
 	}
-	return item, resp, nil
+	return nil, fs.ErrorObjectNotFound
 }
 
 func (f *Fs) DownFileDisguiseBaiduClient(ctx context.Context, path string, options []fs.OpenOption) (resp *http.Response, err error) {
-	item, _, err := f.GetFileMeta(ctx, path, true, false)
+	item, err := f.GetFileMeta(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +112,7 @@ func (f *Fs) DownFile(ctx context.Context, path string, size int64, options []fs
 		wg.Add(1) // 在启动 goroutine 之前计数加一
 		go func(b int64, e int64) {
 			defer wg.Done() // goroutine 完成后计数减一
-			resp, err := f.DownFileBySlice(ctx, downUrl, b, e)
+			resp, err := f.DownFileResponse(ctx, downUrl, b, e)
 			if err != nil {
 				done <- nil
 			} else {
@@ -181,7 +186,7 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 		go func(b int64, e int64, index int) {
 			defer wg.Done() // goroutine 完成后计数减一
 			sem <- struct{}{}
-			resp, err1 := f.DownFileBySlice(ctx, downUrl, b, e)
+			resp, err1 := f.DownFileResponse(ctx, downUrl, b, e)
 			log.Printf("任务1 taskResult: %v", resp)
 			done <- TaskResult{
 				taskId: index,
@@ -226,56 +231,25 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 }
 
 // 串行执行
-func (f *Fs) DownFileSerial(ctx context.Context, path string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
-	downUrl, err := f.GetDownUrl(ctx, path)
+func (f *Fs) DownFileSerial(ctx context.Context, id string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
+	downUrl, err := f.GetDownUrl(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// 计算任务数量
-	taskNum := size / sliceMaxLen
-	if size%sliceMaxLen != 0 {
-		taskNum++
+	response, err := f.DownFileResponse(ctx, downUrl, -1, -1)
+	if err != nil {
+		return nil, err
 	}
-
-	responses := make([]*http.Response, 0, taskNum) // 存放所有的响应
-
-	beginIndex := int64(0)
-	for i := 0; i < int(taskNum); i++ {
-		endIndex := min(beginIndex+sliceMaxLen-1, size-1)
-		response, err := f.DownFileBySlice(ctx, downUrl, beginIndex, endIndex)
-		if err != nil {
-			return nil, err
-		}
-		responses = append(responses, response)
-
-		beginIndex = endIndex + 1
-		if beginIndex >= size {
-			break
-		}
-	}
-
-	readerList := make([]io.Reader, len(responses))
-	closers := make([]io.Closer, len(responses))
-
-	for i, resp := range responses {
-		readerList[i] = resp.Body
-		closers[i] = resp.Body
-	}
-	multi := &multiReadCloser{
-		Reader:  io.MultiReader(readerList...),
-		closers: closers,
-	}
-	return multi, nil
+	return response.Body, nil
 }
 
-func (f *Fs) GetDownUrl(ctx context.Context, path string) (url string, err error) {
-	absolutePath := f.ToAbsolutePath(path)
-	opts, err := f.api.GetLocateDownloadUrl(absolutePath)
+func (f *Fs) GetDownUrl(ctx context.Context, id string) (url string, err error) {
+	opts, err := f.api.GetDownloadUrl(id)
 	if err != nil {
 		return "", err
 	}
-	info := new(api.LocateDownloadVO)
+	info := new(api.DownloadVO)
 	err = f.pacer.Call(func() (bool, error) {
 		resp, err := f.srv.CallJSONBase(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
@@ -283,14 +257,15 @@ func (f *Fs) GetDownUrl(ctx context.Context, path string) (url string, err error
 	if err != nil {
 		return "", err
 	}
-	downUrl := info.URLs[0]
-	return downUrl.URL, nil
+	return info.Dlink, nil
 }
 
 // DownFileBySlice 手机app设定的分片值为32768，或许可以设置更大一些，需要测试
-func (f *Fs) DownFileBySlice(ctx context.Context, downUrl string, beginIndex int64, endIndex int64) (resp *http.Response, err error) {
+func (f *Fs) DownFileResponse(ctx context.Context, downUrl string, beginIndex int64, endIndex int64) (resp *http.Response, err error) {
 	header := make(map[string]string)
-	header["Range"] = fmt.Sprintf("bytes=%d-%d", beginIndex, endIndex)
+	if beginIndex != -1 && endIndex != -1 {
+		header["Range"] = fmt.Sprintf("bytes=%d-%d", beginIndex, endIndex)
+	}
 	opts := &rest.Opts{
 		Method:       "GET",
 		RootURL:      downUrl,
@@ -372,8 +347,8 @@ func (f *Fs) CreateDirForce(ctx context.Context, path string) (err error) {
 }
 
 func (f *Fs) DeleteDirsOrFiles(ctx context.Context, fileList []string) (err error) {
-	opts, err := f.api.DeleteDirsOrFiles(fileList, 0)
-	info := new(api.InfoResponse)
+	opts, err := f.api.DeleteDirsOrFiles(fileList)
+	info := new(api.BaiduResponse)
 	err = f.pacer.Call(func() (bool, error) {
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
@@ -381,20 +356,7 @@ func (f *Fs) DeleteDirsOrFiles(ctx context.Context, fileList []string) (err erro
 	if err != nil {
 		return err
 	}
-	failPathList := make([]string, 0)
-	successPathList := make([]string, 0)
-	for _, item := range info.Info {
-		if item.Errno != 0 {
-			failPathList = append(failPathList, item.Path)
-		} else {
-			successPathList = append(successPathList, item.Path)
-		}
-	}
-	if len(failPathList) == 0 {
-		return nil
-	} else {
-		return errors.WithStack(fmt.Errorf("delete files not success. FileList:(%v)", failPathList))
-	}
+	return nil
 }
 
 func (f *Fs) DeleteDirOrFile(ctx context.Context, filePath string) (err error) {
@@ -621,12 +583,13 @@ func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, p
 
 // Create {"ctime":1713679787,"from_type":1,"fs_id":908199638643457,"isdir":0,"md5":"cd46789bbnf14a0f4de795dd13a70ca3","mtime":1713679787,"path":"/test/999/111/8e3dc4f3a75d1e13f428a1dd15e57fb7.png","size":30051726,"errno":0,"name":"\/test\/999\/111\/8e3dc4f3a75d1e13f428a1dd15e57fb7.png","category":3}
 func (f *Fs) Create(ctx context.Context, path string, preCreateFileData *api.PreCreateFileData, uploadId string) (info *api.CreateVO, err error) {
-	opts, err := f.api.Create(path, preCreateFileData, uploadId)
-	if err != nil {
-		return nil, err
-	}
+	// todo 如果生成的又body，则需要在f.pacer.Call内生成，否则重试的时候body已经被读取过了，就会为空
 	info = new(api.CreateVO)
 	err = f.pacer.Call(func() (bool, error) {
+		opts, err := f.api.Create(path, preCreateFileData, uploadId)
+		if err != nil {
+			return false, err
+		}
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
 	})

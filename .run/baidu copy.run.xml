@@ -3,12 +3,6 @@
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="copy baidupan:\test\test_6.txt baidupan:\2 -vv" />
-    <envs>
-      <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
-      <env name="http_proxy" value="http://127.0.0.1:8888" />
-      <env name="HTTPS_PROXY" value="http://127.0.0.1:8888" />
-      <env name="https_proxy" value="http://127.0.0.1:8888" />
-    </envs>
     <kind value="PACKAGE" />
     <package value="github.com/rclone/rclone" />
     <directory value="$PROJECT_DIR$" />

@@ -126,16 +126,17 @@ func (b *BaiduClient) AddParam(opts *rest.Opts) *rest.Opts {
 	if opts.Parameters == nil {
 		opts.Parameters = make(url.Values)
 	}
-	opts.Parameters.Add("app_id", b.AppId)
-	if strings.Contains(opts.RootURL, "pan.baidu.com") {
-		opts.Parameters.Add("channel", b.Channel)
-		opts.Parameters.Add("web", b.Web)
+	opts.Parameters.Set("app_id", b.AppId)
+	//if strings.Contains(opts.RootURL, "pan.baidu.com") {
+	if strings.Contains(b.Client.GetRoot(), "pan.baidu.com") {
+		opts.Parameters.Set("channel", b.Channel)
+		opts.Parameters.Set("web", b.Web)
 		if b.Bdstoken != "" {
-			opts.Parameters.Add("bdstoken", b.Bdstoken)
+			opts.Parameters.Set("bdstoken", b.Bdstoken)
 		}
-		opts.Parameters.Add("logid", b.LogId)
-		opts.Parameters.Add("clienttype", b.ClientType)
-		opts.Parameters.Add("dp-logid", b.getDpLogId())
+		opts.Parameters.Set("logid", b.LogId)
+		opts.Parameters.Set("clienttype", b.ClientType)
+		opts.Parameters.Set("dp-logid", b.getDpLogId())
 	}
 	return opts
 }
