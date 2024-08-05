@@ -314,7 +314,7 @@ func (f *Fs) GetQuotaInfo(ctx context.Context) (*api.QuotaInfoResponse, error) {
 }
 
 func (f *Fs) ListDirFilesPage(ctx context.Context, cursor string) (listRes *api.ListResponse, resp *http.Response, err error) {
-	opts, err := f.api.ListDirFiles("")
+	opts, err := f.api.ListDirFiles(cursor)
 	if err != nil {
 		return nil, nil, err
 	}
