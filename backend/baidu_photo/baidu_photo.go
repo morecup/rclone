@@ -532,6 +532,19 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	return srcObj, nil
 }
 
+func (f *Fs) About(ctx context.Context) (*fs.Usage, error) {
+	info, err := f.GetQuotaInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	usage := &fs.Usage{
+		Total: fs.NewUsageValue(info.Quota),             // quota of bytes that can be used
+		Used:  fs.NewUsageValue(info.Used),              // bytes in use
+		Free:  fs.NewUsageValue(info.Quota - info.Used), // bytes which can be uploaded before reaching the quota
+	}
+	return usage, nil
+}
+
 // Convert a list item into fs.Directory or fs.Object
 func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) (entry fs.DirEntry, err error) {
 	if dir != "" {

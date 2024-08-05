@@ -56,6 +56,17 @@ func (b *BaiduApi) ListDirFiles(cursor string) (opts *rest.Opts, err error) {
 	return opts, nil
 }
 
+func (b *BaiduApi) GetQuotaInfo() (opts *rest.Opts, err error) {
+	opts = &rest.Opts{
+		Method:     "GET",
+		Path:       "/youai/user/v1/quotainfo",
+		Parameters: url.Values{
+			//"fields": []string{"[\"bdstoken\",\"token\",\"uk\",\"isdocuser\",\"servertime\"]"},
+		},
+	}
+	return opts, nil
+}
+
 func (b *BaiduApi) GetUserInfo() (opts *rest.Opts, err error) {
 	opts = &rest.Opts{
 		Method:     "POST",

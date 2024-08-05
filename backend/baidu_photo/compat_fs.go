@@ -297,6 +297,22 @@ func (f *Fs) GetUserInfo(ctx context.Context) (*api.UserInfo, error) {
 	return info.UserInfo, nil
 }
 
+func (f *Fs) GetQuotaInfo(ctx context.Context) (*api.QuotaInfoResponse, error) {
+	opts, err := f.api.GetQuotaInfo()
+	if err != nil {
+		return nil, err
+	}
+	info := new(api.QuotaInfoResponse)
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
 func (f *Fs) ListDirFilesPage(ctx context.Context, cursor string) (listRes *api.ListResponse, resp *http.Response, err error) {
 	opts, err := f.api.ListDirFiles("")
 	if err != nil {

@@ -121,6 +121,13 @@ type UserInfo struct {
 	UserAuthState    int32  `json:"user_auth_state"`
 }
 
+type QuotaInfoResponse struct {
+	BaseBaiduResponse
+	Quota     int64 `json:"quota"`
+	Used      int64 `json:"used"`
+	IsUnlimit int   `json:"is_unlimit"`
+}
+
 type FileManagerParam struct {
 	Path    string `json:"path,omitempty"`
 	NewName string `json:"newname,omitempty"`
@@ -174,7 +181,7 @@ type BaseItem struct {
 	FsID           int64  `json:"fs_id"`
 	Path           string `json:"path"`
 	Md5            string `json:"md5"`
-	FromType       string `json:"from_type"`
+	FromType       int32  `json:"from_type"`
 	ServerMd5      string `json:"server_md5"`
 	Size           int64  `json:"size"`
 	Category       int    `json:"category"`
