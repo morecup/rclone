@@ -147,8 +147,8 @@ type PreCreateFileData struct {
 	BlockList  []string `schema:"-"`
 	ContentMd5 string   `schema:"content-md5"`
 	SliceMd5   string   `schema:"slice-md5"`
-	LocalCtime int64    `schema:"local_ctime"`
-	LocalMtime int64    `schema:"local_mtime"`
+	LocalCtime int64    `schema:"local_ctime,omitempty"`
+	LocalMtime int64    `schema:"local_mtime,omitempty"`
 }
 
 type FragmentVO struct {
@@ -167,13 +167,13 @@ type PreCreateVO struct {
 	Path       string           `json:"path"` //return_type为1时 才会有这一项
 	ReturnType int              `json:"return_type"`
 	BlockList  []fs.StringValue `json:"block_list"` //return_type为1时 才会有这一项
-	Info       Item             `json:"info"`       //return_type为2时 才会有这一项
+	Data       *BaseItem        `json:"data"`       //return_type为2时 才会有这一项
 	UploadId   string           `json:"uploadid"`   //return_type为1时 才会有这一项
 }
 
 type CreateVO struct {
 	BaseBaiduResponse
-	ReturnType int       `json:"return_type"`
+	ReturnType int       `json:"return_type"` //不可靠，可能没有这个字段
 	Data       *BaseItem `json:"data"`
 }
 

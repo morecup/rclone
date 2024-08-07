@@ -15,6 +15,17 @@ func BodyList(slice []string) string {
 		return "[]"
 	}
 }
+
+func BodyNumList(slice []string) string {
+	if len(slice) > 0 {
+		nospace := strings.Join(slice, ",")
+		quoted := fmt.Sprintf("[%s]", nospace)
+		return quoted
+	} else {
+		return "[]"
+	}
+}
+
 func BoolToInt(b bool) int {
 	if b {
 		return 1

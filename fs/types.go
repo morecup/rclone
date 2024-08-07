@@ -191,6 +191,23 @@ type Metadataer interface {
 	Metadata(ctx context.Context) (Metadata, error)
 }
 
+type FileIdOperator interface {
+	DownFileFromId(ctx context.Context, id string, beginIndex int64, endIndex int64) (in io.ReadCloser, err error)
+	UploadFileReturnId(ctx context.Context, in io.Reader, src ObjectInfo, options ...OpenOption) (Object, string, error)
+}
+type FileFragInfo struct {
+	Size       int64  `json:"size"`
+	SliceMd5   string `json:"sliceMd5,omitempty"`
+	ContentMd5 string `json:"contentMd5,omitempty"`
+	Part       int32  `json:"part"`
+	Id         string `json:"fsid,omitempty"`
+	Path       string `json:"path,omitempty"`
+}
+type FileRapidOperator interface {
+	DownFileRapid(ctx context.Context, fileFragInfo FileFragInfo, beginIndex int64, endIndex int64) (in io.ReadCloser, err error)
+	UploadFileReturnRapidInfo(ctx context.Context, in io.Reader, src ObjectInfo, options ...OpenOption) (*FileFragInfo, Object, error)
+}
+
 // FullObjectInfo contains all the read-only optional interfaces
 //
 // Use for checking making wrapping ObjectInfos implement everything

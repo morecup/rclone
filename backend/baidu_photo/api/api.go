@@ -119,9 +119,9 @@ func (b *BaiduApi) CreateDir(path string, isdir bool) (opts *rest.Opts, err erro
 	return opts, nil
 }
 
-func (b *BaiduApi) DeleteDirsOrFiles(fileList []string) (opts *rest.Opts, err error) {
+func (b *BaiduApi) DeleteDirsOrFiles(fileIdList []string) (opts *rest.Opts, err error) {
 	data := url.Values{}
-	data.Add("filelist", BodyList(FixToBaiduPathList(fileList)))
+	data.Add("fsid_list", BodyNumList(fileIdList))
 
 	opts = &rest.Opts{
 		Method:     "GET",
@@ -284,7 +284,9 @@ func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, upl
 	}
 	data.Add("path", FixToBaiduPath(path))
 	data.Add("isdir", "0")
-	data.Add("uploadid", uploadId)
+	if uploadId != "" {
+		data.Add("uploadid", uploadId)
+	}
 	data.Add("rtype", "1")
 	data.Add("ctype", "11")
 

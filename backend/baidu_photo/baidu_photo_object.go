@@ -7,7 +7,13 @@ import (
 	"github.com/rclone/rclone/fs/hash"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+)
+
+const (
+	photoSuffix        = ".bmp"
+	maxPhotoUploadSize = 1024 * 1024 * 30 // 不能等于
 )
 
 // Object describes a OneDrive object
@@ -26,6 +32,17 @@ type Object struct {
 }
 
 // ------------------------------------------------------------
+func (o *Object) setObject(object *Object) {
+	o.fs = object.fs
+	o.modTime = object.modTime
+	o.hasMetaData = object.hasMetaData
+	o.isOneNoteFile = object.isOneNoteFile
+	o.size = object.size
+	o.id = object.id
+	o.hash = object.hash
+	o.mimeType = object.mimeType
+	o.remote = object.remote
+}
 
 // Fs returns the parent Fs
 func (o *Object) Fs() fs.Info {
@@ -37,12 +54,12 @@ func (o *Object) String() string {
 	if o == nil {
 		return "<nil>"
 	}
-	return o.remote
+	return o.Remote()
 }
 
 // Remote returns the remote path
 func (o *Object) Remote() string {
-	return o.remote
+	return strings.TrimSuffix(o.remote, photoSuffix)
 }
 
 // Hash returns the SHA-1 of an object returning a lowercase hex string
@@ -103,14 +120,14 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 	//使用 ioutil.NopCloser 将 buf 包装成一个 io.ReadCloser
 	//readCloser1 := ioutil.NopCloser(reader)
 	//return readCloser1, nil
-	if o.remote == "" {
+	if o.id == "" {
 		return nil, errors.New("can't download - no id")
 	}
 	if o.isOneNoteFile {
 		return nil, errors.New("can't open a OneNote file")
 	}
 	fs.FixRangeOption(options, o.size)
-	return o.fs.DownFileSerial(ctx, o.id, o.size, options)
+	return o.fs.DownFileFromId(ctx, o.id, -1, -1)
 }
 
 // Update the object with the contents of the io.Reader, modTime and size
@@ -118,13 +135,22 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 // The new object may have been created if an error is returned
 func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
 
-	err = o.fs.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), o.fs.ToAbsolutePath(src.Remote()))
-	return err
+	baseItem, _, err := o.fs.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), o.fs.ToAbsolutePath(src.Remote()))
+	if err != nil {
+		return err
+	} else {
+		object, err := o.fs.BaseItemToDirOrObject(baseItem)
+		if err != nil {
+			return err
+		}
+		o.setObject(object)
+		return nil
+	}
 }
 
 // Remove an object
 func (o *Object) Remove(ctx context.Context) error {
-	err := o.fs.DeleteDirOrFile(ctx, o.fs.ToAbsolutePath(o.remote))
+	err := o.fs.DeleteDirOrFile(ctx, o.id)
 	return err
 }
 

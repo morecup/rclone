@@ -137,7 +137,7 @@ type Options struct {
 	Enc                     encoder.MultiEncoder `config:"encoding"`
 }
 
-// Fs represents a remote OneDrive
+// Fs represents a remote
 type Fs struct {
 	name         string             // name of this remote
 	root         string             // the path we are working on
@@ -248,7 +248,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	// Set the user defined hash
 	if opt.HashType == "auto" || opt.HashType == "" {
-		opt.HashType = QuickXorHashType.String()
+		opt.HashType = "md5"
 	}
 	err = f.hashType.Set(opt.HashType)
 	if err != nil {
@@ -300,7 +300,8 @@ func (f *Fs) Features() *fs.Features {
 
 // Hashes returns the supported hash sets.
 func (f *Fs) Hashes() hash.Set {
-	return hash.Set(f.hashType)
+	//return hash.Set(f.hashType)
+	return hash.Set(hash.None)
 }
 
 // Precision return the precision of this Fs
@@ -362,13 +363,8 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 // will return the object and the error, otherwise will return
 // nil and the error
 func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
-	remote := src.Remote()
-	size := src.Size()
-	modTime := src.ModTime(ctx)
-
-	o := f.buildObject(ctx, remote, modTime, size)
-
-	return o, o.Update(ctx, in, src, options...)
+	id, _, err := f.UploadFileReturnId(ctx, in, src, options...)
+	return id, err
 }
 
 func (f *Fs) buildObject(ctx context.Context, remote string, modTime time.Time, size int64) (o *Object) {
@@ -556,7 +552,23 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		hasMetaData:   true,
 		isOneNoteFile: false,
 		size:          info.Size,
-		modTime:       time.Unix(info.ShootTime, 0),
+		modTime:       time.Unix(info.Mtime, 0),
+		id:            strconv.FormatInt(info.FsID, 10),
+		hash:          "md5",
+		mimeType:      "json",
+	}
+
+	return entry, nil
+}
+
+func (f *Fs) BaseItemToDirOrObject(info *api.BaseItem) (entry *Object, err error) {
+	entry = &Object{
+		fs:            f,
+		remote:        path.Base(info.Path),
+		hasMetaData:   true,
+		isOneNoteFile: false,
+		size:          info.Size,
+		modTime:       time.Unix(info.Mtime, 0),
 		id:            strconv.FormatInt(info.FsID, 10),
 		hash:          "md5",
 		mimeType:      "json",

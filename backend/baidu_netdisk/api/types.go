@@ -53,7 +53,7 @@ type Item struct {
 	OwnerID        int    `json:"owner_id"`
 	TkbindID       int    `json:"tkbind_id"`
 	Size           int64  `json:"size"`
-	FsID           int    `json:"fs_id"`
+	FsID           int64  `json:"fs_id"`
 	Md5            string `json:"md5"`
 	ExtentInt3     int64  `json:"extent_int3"`
 	Path           string `json:"path"`
@@ -131,20 +131,24 @@ type PreCreateVO struct {
 	Path       string           `json:"path"` //return_type为1时 才会有这一项
 	ReturnType int              `json:"return_type"`
 	BlockList  []fs.StringValue `json:"block_list"` //return_type为1时 才会有这一项
-	Info       Item             `json:"info"`       //return_type为2时 才会有这一项
+	Info       *BaseItem        `json:"info"`       //return_type为2时 才会有这一项
 	UploadId   string           `json:"uploadid"`   //return_type为1时 才会有这一项
 }
 
 type CreateVO struct {
 	BaseBaiduResponse
-	Ctime    int    `json:"ctime"`
+	BaseItem
+}
+
+type BaseItem struct {
+	Ctime    int64  `json:"ctime"`
 	FromType int    `json:"from_type"`
 	FsId     int64  `json:"fs_id"`
 	Isdir    int    `json:"isdir"`
 	Md5      string `json:"md5"`
-	Mtime    int    `json:"mtime"`
+	Mtime    int64  `json:"mtime"`
 	Path     string `json:"path"`
-	Size     int    `json:"size"`
+	Size     int64  `json:"size"`
 	Name     string `json:"name"`
 	Category int    `json:"category"`
 }

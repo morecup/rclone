@@ -53,13 +53,13 @@ func NewBaiduClient(client *rest.Client, logId string) *BaiduClient {
 		logId = fmt.Sprintf("%d%s", timestamp, strconv.FormatFloat(randomNumber, 'g', 16, 64))
 	}
 	b := &BaiduClient{
-		Client:  client,
-		Channel: "chunlei",
-		Web:     "1",
-		AppId:   "250528",
+		Client: client,
+		//Channel: "00000000000000000000000000000000",
+		Web:   "1",
+		AppId: "250528",
 		//Bdstoken:   "edc64747a74ff7c02c5f85e16c2af2d5",
-		LogId:      base64.StdEncoding.EncodeToString([]byte(logId)),
-		ClientType: "0",
+		LogId: base64.StdEncoding.EncodeToString([]byte(logId)),
+		//ClientType: "0",
 		//DpLogId:    "83616500728872120038",
 	}
 	b.sessionId = generateRandomNumber(6)
@@ -129,13 +129,13 @@ func (b *BaiduClient) AddParam(opts *rest.Opts) *rest.Opts {
 	opts.Parameters.Set("app_id", b.AppId)
 	//if strings.Contains(opts.RootURL, "pan.baidu.com") {
 	if strings.Contains(b.Client.GetRoot(), "pan.baidu.com") {
-		opts.Parameters.Set("channel", b.Channel)
+		//opts.Parameters.Set("channel", b.Channel)
 		opts.Parameters.Set("web", b.Web)
 		if b.Bdstoken != "" {
 			opts.Parameters.Set("bdstoken", b.Bdstoken)
 		}
 		opts.Parameters.Set("logid", b.LogId)
-		opts.Parameters.Set("clienttype", b.ClientType)
+		//opts.Parameters.Set("clienttype", b.ClientType)
 		opts.Parameters.Set("dp-logid", b.getDpLogId())
 	}
 	return opts

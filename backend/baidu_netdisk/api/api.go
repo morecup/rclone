@@ -231,7 +231,7 @@ func (b *BaiduApi) Precreate(path string, rapidOffsetData *RapidOffsetData, preC
 	data.Add("path", FixToBaiduPath(path))
 	data.Add("isdir", "0")
 	data.Add("autoinit", "1")
-	data.Add("rtype", "1")
+	data.Add("rtype", "3")
 
 	opts = &rest.Opts{
 		Method:      "POST",
@@ -294,7 +294,7 @@ func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, upl
 	data.Add("path", FixToBaiduPath(path))
 	data.Add("isdir", "0")
 	data.Add("uploadid", uploadId)
-	data.Add("rtype", "1")
+	data.Add("rtype", "3")
 
 	opts = &rest.Opts{
 		Method:      "POST",

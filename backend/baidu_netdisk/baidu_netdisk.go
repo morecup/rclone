@@ -311,7 +311,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	// Set the user defined hash
 	if opt.HashType == "auto" || opt.HashType == "" {
-		opt.HashType = QuickXorHashType.String()
+		opt.HashType = "md5"
 	}
 	err = f.hashType.Set(opt.HashType)
 	if err != nil {
@@ -387,7 +387,8 @@ func (f *Fs) Features() *fs.Features {
 
 // Hashes returns the supported hash sets.
 func (f *Fs) Hashes() hash.Set {
-	return hash.Set(f.hashType)
+	//return hash.Set(f.hashType)
+	return hash.Set(hash.None)
 }
 
 // Precision return the precision of this Fs
@@ -434,6 +435,7 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 		return nil, err
 	}
 	object, ok := entry.(*Object)
+	object.remote = remote
 	if !ok {
 		return nil, errors.WithStack(fs.ErrorObjectNotFound)
 	}
@@ -450,13 +452,12 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 // will return the object and the error, otherwise will return
 // nil and the error
 func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
-	remote := src.Remote()
-	size := src.Size()
-	modTime := src.ModTime(ctx)
-
-	o := f.buildObject(ctx, remote, modTime, size)
-
-	return o, o.Update(ctx, in, src, options...)
+	baseItem, err := f.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), f.ToAbsolutePath(src.Remote()))
+	if err != nil {
+		return nil, err
+	}
+	object, err := f.NewObjectFromBaseItem(baseItem)
+	return object, err
 }
 
 func (f *Fs) buildObject(ctx context.Context, remote string, modTime time.Time, size int64) (o *Object) {
@@ -619,7 +620,7 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		dir = dir + "/"
 	}
 	if info.IsDir == 1 {
-		entry = fs.NewDir(dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(info.FsID)).SetItems(-1).SetSize(-1)
+		entry = fs.NewDir(dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
 	} else if info.IsDir == 0 {
 		entry = &Object{
 			fs:            f,
@@ -628,13 +629,31 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 			isOneNoteFile: false,
 			size:          info.Size,
 			modTime:       time.Unix(info.LocalMtime, 0),
-			id:            strconv.Itoa(info.FsID),
+			id:            strconv.Itoa(int(info.FsID)),
 			hash:          "md5",
 			mimeType:      "json",
 		}
 	}
-
 	return entry, nil
+}
+
+func (f *Fs) NewObjectFromBaseItem(item *api.BaseItem) (*Object, error) {
+	relativePath, err := f.ToRelativePath(strings.TrimLeft(item.Path, "/"))
+	if err != nil {
+		return nil, err
+	}
+	object := &Object{
+		fs:            f,
+		remote:        relativePath,
+		hasMetaData:   true,
+		isOneNoteFile: false,
+		size:          item.Size,
+		modTime:       time.Unix(item.Mtime, 0),
+		id:            strconv.FormatInt(item.FsId, 10),
+		hash:          item.Md5,
+		mimeType:      "json",
+	}
+	return object, nil
 }
 
 func (f *Fs) ToAbsolutePath(relativePath string) string {
@@ -648,6 +667,13 @@ func (f *Fs) ToRelativeFilePath(relativePath string, fileName string) string {
 		relativePath = relativePath + "/"
 	}
 	return relativePath + fileName
+}
+func (f *Fs) ToRelativePath(absolutePath string) (string, error) {
+	relativePath, err := filepath.Rel(f.root, absolutePath)
+	if err != nil {
+		return "", err
+	}
+	return relativePath, nil
 }
 func SplitPath(pathStr string) (dir, file string) {
 	dir, file = path.Split(pathStr)

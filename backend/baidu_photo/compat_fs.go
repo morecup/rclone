@@ -43,7 +43,7 @@ func (f *Fs) GetFileMeta(ctx context.Context, filePath string) (item *api.Item, 
 	if err != nil {
 		return nil, err
 	}
-	fileBasePath := path.Base(filePath)
+	fileBasePath := path.Base(filePath + photoSuffix)
 	for _, itemR := range itemList {
 		remoteFileBasePath := path.Base(itemR.Path)
 		if fileBasePath == remoteFileBasePath {
@@ -71,20 +71,6 @@ func (f *Fs) DownFileDisguiseBaiduClient(ctx context.Context, path string, optio
 		return nil, err
 	}
 	return resp, nil
-}
-
-type multiReadCloser struct {
-	io.Reader
-	closers []io.Closer
-}
-
-func (m *multiReadCloser) Close() (err error) {
-	for _, closer := range m.closers {
-		if e := closer.Close(); e != nil {
-			err = e
-		}
-	}
-	return
 }
 
 // 有多少切片就开多少线程去下载
@@ -145,9 +131,9 @@ func (f *Fs) DownFile(ctx context.Context, path string, size int64, options []fs
 		readerList[i] = resp.Body
 		closers[i] = resp.Body
 	}
-	multi := &multiReadCloser{
+	multi := &readers.MultiReadCloser{
 		Reader:  io.MultiReader(readerList...),
-		closers: closers,
+		Closers: closers,
 	}
 	return multi, nil
 }
@@ -223,21 +209,94 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 		readerList[i] = resp.Body
 		closers[i] = resp.Body
 	}
-	multi := &multiReadCloser{
+	multi := &readers.MultiReadCloser{
 		Reader:  io.MultiReader(readerList...),
-		closers: closers,
+		Closers: closers,
 	}
 	return multi, nil
 }
 
 // 串行执行
-func (f *Fs) DownFileSerial(ctx context.Context, id string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
+func (f *Fs) DownFileFromId(ctx context.Context, id string, beginIndex int64, endIndex int64) (in io.ReadCloser, err error) {
 	downUrl, err := f.GetDownUrl(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := f.DownFileResponse(ctx, downUrl, -1, -1)
+	response, err := f.DownFileResponse(ctx, downUrl, beginIndex, endIndex)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
+func (f *Fs) UploadFileReturnId(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, string, error) {
+	baseItem, _, err := f.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), f.ToAbsolutePath(src.Remote()))
+	if err != nil {
+		return nil, "", err
+	} else {
+		object, err := f.BaseItemToDirOrObject(baseItem)
+		if err != nil {
+			return nil, "", err
+		}
+		return object, object.id, nil
+	}
+}
+
+func (f *Fs) UploadFileReturnRapidInfo(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (*fs.FileFragInfo, fs.Object, error) {
+	baseItem, preCreateFileData, err := f.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), f.ToAbsolutePath(src.Remote()))
+	if err != nil {
+		return nil, nil, err
+	} else {
+		object, err := f.BaseItemToDirOrObject(baseItem)
+		if err != nil {
+			return nil, nil, err
+		}
+		fileFragInfo := &fs.FileFragInfo{
+			Size:       object.size,
+			SliceMd5:   preCreateFileData.SliceMd5,
+			ContentMd5: preCreateFileData.ContentMd5,
+			Id:         object.id,
+		}
+		return fileFragInfo, object, nil
+	}
+}
+
+func (f *Fs) DownFileRapid(ctx context.Context, fileFragInfo fs.FileFragInfo, beginIndex int64, endIndex int64) (in io.ReadCloser, err error) {
+	var downUrl string = ""
+	if fileFragInfo.Id != "" {
+		downUrl, err = f.GetDownUrl(ctx, fileFragInfo.Id)
+		if err != nil && !errors.Is(err, fs.ErrorObjectNotFound) {
+			return nil, err
+		}
+	}
+	if downUrl == "" && fileFragInfo.ContentMd5 != "" && fileFragInfo.SliceMd5 != "" {
+		//	fsid不存在
+		preCreateFileData := &api.PreCreateFileData{
+			BlockList:  nil,
+			ContentMd5: fileFragInfo.ContentMd5,
+			SliceMd5:   fileFragInfo.SliceMd5,
+			Size:       fileFragInfo.Size,
+		}
+		preCreateFileData.BlockList = nil
+		preCreateFileData.ContentMd5 = fileFragInfo.ContentMd5
+		createVO, err := f.Create(ctx, "/"+fileFragInfo.ContentMd5+fileFragInfo.SliceMd5, preCreateFileData, "")
+		if err != nil {
+			return nil, err
+		}
+		if createVO.Data != nil {
+			if createVO.Data.FsID != 0 {
+				downUrl, err = f.GetDownUrl(ctx, fileFragInfo.Id)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+	if downUrl == "" {
+		return nil, errors.New("can not rapid")
+	}
+	response, err := f.DownFileResponse(ctx, downUrl, beginIndex, endIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -251,9 +310,12 @@ func (f *Fs) GetDownUrl(ctx context.Context, id string) (url string, err error) 
 	}
 	info := new(api.DownloadVO)
 	err = f.pacer.Call(func() (bool, error) {
-		resp, err := f.srv.CallJSONBase(ctx, opts, nil, info)
+		resp, err := f.srv.CallJSONIgnore(ctx, opts, nil, info, []int{50504})
 		return shouldRetry(ctx, resp, err)
 	})
+	if info.Errno == 50504 {
+		return "", fs.ErrorObjectNotFound
+	}
 	if err != nil {
 		return "", err
 	}
@@ -362,8 +424,8 @@ func (f *Fs) CreateDirForce(ctx context.Context, path string) (err error) {
 	return nil
 }
 
-func (f *Fs) DeleteDirsOrFiles(ctx context.Context, fileList []string) (err error) {
-	opts, err := f.api.DeleteDirsOrFiles(fileList)
+func (f *Fs) DeleteDirsOrFiles(ctx context.Context, fileIdList []string) (err error) {
+	opts, err := f.api.DeleteDirsOrFiles(fileIdList)
 	info := new(api.BaiduResponse)
 	err = f.pacer.Call(func() (bool, error) {
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
@@ -375,8 +437,8 @@ func (f *Fs) DeleteDirsOrFiles(ctx context.Context, fileList []string) (err erro
 	return nil
 }
 
-func (f *Fs) DeleteDirOrFile(ctx context.Context, filePath string) (err error) {
-	return f.DeleteDirsOrFiles(ctx, []string{filePath})
+func (f *Fs) DeleteDirOrFile(ctx context.Context, fileIdPath string) (err error) {
+	return f.DeleteDirsOrFiles(ctx, []string{fileIdPath})
 }
 
 func (f *Fs) RenameDirsOrFiles(ctx context.Context, fileParamList []api.FileManagerParam) (err error) {
@@ -439,15 +501,19 @@ func (f *Fs) MoveOrCopyDirOrFile(ctx context.Context, fileParamList api.FileMana
 	return f.MoveOrCopyDirsOrFiles(ctx, []api.FileManagerParam{fileParamList}, operate)
 }
 
-func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) error {
-	reader := readers.NewRepeatableReader(in)
-	preCreateFileData, preCreateDTO, err := f.PreCreate(ctx, reader, localCtime, localMtime, size, path)
-	if err != nil {
-		return err
+func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) (*api.BaseItem, *api.PreCreateFileData, error) {
+	if size >= maxPhotoUploadSize {
+		return nil, nil, errors.Errorf("file is too big. (%s)", path)
 	}
-	if preCreateDTO.ReturnType != 1 {
+	path = path + photoSuffix
+	reader := readers.NewRepeatableReader(in)
+	preCreateFileData, preCreateDTO, baseItem, err := f.PreCreate(ctx, reader, localCtime, localMtime, size, path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if baseItem != nil {
 		fs.Debugf(f, "rapid upload success!(%s)", path)
-		return nil
+		return baseItem, preCreateFileData, nil
 	}
 
 	uploadId := preCreateDTO.UploadId
@@ -466,18 +532,18 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, loc
 		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, position, size, reader, n)
 		//if(info.Md5)
 		if err != nil {
-			return nil
+			return nil, nil, err
 		}
 		remaining -= n
 		position += n
 		partSeq += 1
 	}
 
-	_, err = f.Create(ctx, path, preCreateFileData, uploadId)
+	info, err := f.Create(ctx, path, preCreateFileData, uploadId)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	return nil
+	return info.Data, preCreateFileData, nil
 }
 
 const uploadBlockSize = 1024 * 1024 * 4
@@ -487,11 +553,11 @@ const offsetSize = 1024 * 256
 // PreCreate {"path":"/test/999/111/1234.exe","return_type":1,"block_list":["5910a591dd8fc18c32a8f3df4fdc1761","a5fc157d78e6ad1c7e114b056c92821e"],"errno":0,"request_id":278285463311322051}
 // { "return_type": 2, "errno": 0, "info": { "md5": "5ddc05b01g7f6ae7d6adc90d912c983d", "category": 6, "fs_id": 166064416325948, "request_id": 280244028406040000, "from_type": 1, "size": 112060240, "isdir": 0, "mtime": 1713672326, "ctime": 1713672326, "path": "/test/999/111/1234_20240421_120525.exe" }, "request_id": 280244028406040573 }
 // return_type 1 无法秒传，准备上传 2 秒传成功 3 文件已存在（仅一刻相册，在百度网盘中只会返回2）
-func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, localCtime int64, localMtime int64, size int64, path string) (preCreateFileData *api.PreCreateFileData, info *api.PreCreateVO, err error) {
+func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, localCtime int64, localMtime int64, size int64, path string) (preCreateFileData *api.PreCreateFileData, info *api.PreCreateVO, baseItem *api.BaseItem, err error) {
 	//reader := readers.NewRepeatableReader(in)
 	_, err = reader.Seek(0, io.SeekStart)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer func(reader *readers.RepeatableReader, offset int64, whence int) {
 		_, err := reader.Seek(offset, whence)
@@ -539,6 +605,13 @@ func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, lo
 	preCreateFileData.LocalMtime = localMtime //src.ModTime(ctx).Unix()
 	preCreateFileData.Size = size
 
+	if size <= sliceSize {
+		baseItem, success, _ := f.Rapid(ctx, path, preCreateFileData, "")
+		if success {
+			return preCreateFileData, nil, baseItem, nil
+		}
+	}
+
 	nowTime := time.Now().Unix()
 
 	var str = strconv.FormatInt(f.UserId, 10) + contentMd5 + strconv.FormatInt(nowTime, 10)
@@ -547,19 +620,19 @@ func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, lo
 	md5Str := hex.EncodeToString(h.Sum(nil))[0:8]
 	result, err := strconv.ParseInt(md5Str, 16, 64)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if size >= offsetSize {
 		rapidOffsetData.DataOffset = result % (size - offsetSize + 1)
 		rapidOffsetData.DataTime = nowTime
 		_, err = reader.Seek(rapidOffsetData.DataOffset, io.SeekStart)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		offsetBuffer := make([]byte, offsetSize)
 		n, err := io.ReadFull(reader, offsetBuffer)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		// 将读取的数据编码为base64
 		rapidOffsetData.DataContent = base64.StdEncoding.EncodeToString(offsetBuffer[:n])
@@ -567,14 +640,20 @@ func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, lo
 
 	opts, err := f.api.Precreate(path, rapidOffsetData, preCreateFileData)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	info = new(api.PreCreateVO)
 	err = f.pacer.Call(func() (bool, error) {
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
 	})
-	return preCreateFileData, info, err
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if info.Data != nil {
+		return preCreateFileData, info, info.Data, nil
+	}
+	return preCreateFileData, info, nil, err
 }
 
 func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, start int64, totalSize int64, chunk io.ReadSeeker, chunkSize int64, options ...fs.OpenOption) (info *api.FragmentVO, err error) {
@@ -610,4 +689,25 @@ func (f *Fs) Create(ctx context.Context, path string, preCreateFileData *api.Pre
 		return shouldRetry(ctx, resp, err)
 	})
 	return info, err
+}
+
+// Rapid fs.ErrorFileRapidUpload
+func (f *Fs) Rapid(ctx context.Context, path string, preCreateFileData *api.PreCreateFileData, uploadId string) (baseItem *api.BaseItem, success bool, err error) {
+	info := new(api.CreateVO)
+	err = f.pacer.Call(func() (bool, error) {
+		opts, err := f.api.Create(path, preCreateFileData, uploadId)
+		if err != nil {
+			return false, err
+		}
+		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if info != nil && info.Data != nil {
+		return info.Data, true, nil
+	} else {
+		return nil, false, fs.ErrorFileRapidUpload
+	}
 }

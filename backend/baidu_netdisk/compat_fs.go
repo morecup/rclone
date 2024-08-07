@@ -68,20 +68,6 @@ func (f *Fs) DownFileDisguiseBaiduClient(ctx context.Context, path string, optio
 	return resp, nil
 }
 
-type multiReadCloser struct {
-	io.Reader
-	closers []io.Closer
-}
-
-func (m *multiReadCloser) Close() (err error) {
-	for _, closer := range m.closers {
-		if e := closer.Close(); e != nil {
-			err = e
-		}
-	}
-	return
-}
-
 // 有多少切片就开多少线程去下载
 func (f *Fs) DownFile(ctx context.Context, path string, size int64, options []fs.OpenOption) (in io.ReadCloser, err error) {
 	downUrl, err := f.GetDownUrl(ctx, path)
@@ -140,9 +126,9 @@ func (f *Fs) DownFile(ctx context.Context, path string, size int64, options []fs
 		readerList[i] = resp.Body
 		closers[i] = resp.Body
 	}
-	multi := &multiReadCloser{
+	multi := &readers.MultiReadCloser{
 		Reader:  io.MultiReader(readerList...),
-		closers: closers,
+		Closers: closers,
 	}
 	return multi, nil
 }
@@ -218,9 +204,9 @@ func (f *Fs) DownFileSe(ctx context.Context, path string, size int64, options []
 		readerList[i] = resp.Body
 		closers[i] = resp.Body
 	}
-	multi := &multiReadCloser{
+	multi := &readers.MultiReadCloser{
 		Reader:  io.MultiReader(readerList...),
-		closers: closers,
+		Closers: closers,
 	}
 	return multi, nil
 }
@@ -262,9 +248,9 @@ func (f *Fs) DownFileSerial(ctx context.Context, path string, size int64, option
 		readerList[i] = resp.Body
 		closers[i] = resp.Body
 	}
-	multi := &multiReadCloser{
+	multi := &readers.MultiReadCloser{
 		Reader:  io.MultiReader(readerList...),
-		closers: closers,
+		Closers: closers,
 	}
 	return multi, nil
 }
@@ -459,15 +445,15 @@ func (f *Fs) MoveOrCopyDirOrFile(ctx context.Context, fileParamList api.FileMana
 	return f.MoveOrCopyDirsOrFiles(ctx, []api.FileManagerParam{fileParamList}, operate)
 }
 
-func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) error {
+func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, localMtime int64, size int64, path string) (*api.BaseItem, error) {
 	reader := readers.NewRepeatableReader(in)
 	preCreateFileData, preCreateDTO, err := f.PreCreate(ctx, reader, localCtime, localMtime, size, path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if preCreateDTO.ReturnType != 1 {
 		fs.Debugf(f, "rapid upload success!(%s)", path)
-		return nil
+		return preCreateDTO.Info, nil
 	}
 
 	uploadId := preCreateDTO.UploadId
@@ -486,18 +472,18 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, loc
 		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, position, size, reader, n)
 		//if(info.Md5)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 		remaining -= n
 		position += n
 		partSeq += 1
 	}
 
-	_, err = f.Create(ctx, path, preCreateFileData, uploadId)
+	info, err := f.Create(ctx, path, preCreateFileData, uploadId)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &info.BaseItem, nil
 }
 
 const uploadBlockSize = 1024 * 1024 * 4
