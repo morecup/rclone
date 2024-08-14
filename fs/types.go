@@ -194,6 +194,7 @@ type Metadataer interface {
 type FileIdOperator interface {
 	DownFileFromId(ctx context.Context, id string, beginIndex int64, endIndex int64) (in io.ReadCloser, err error)
 	UploadFileReturnId(ctx context.Context, in io.Reader, src ObjectInfo, options ...OpenOption) (Object, string, error)
+	RemoveFileFromId(ctx context.Context, id string, size int64) error
 }
 type FileFragInfo struct {
 	Size       int64  `json:"size"`

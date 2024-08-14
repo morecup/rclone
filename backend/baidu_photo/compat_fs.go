@@ -20,6 +20,12 @@ import (
 	"time"
 )
 
+const (
+	uploadBlockSize = 1024 * 1024 * 4
+	sliceSize       = 1024 * 256
+	offsetSize      = 1024 * 256
+)
+
 // GetFileMetas 返回多个文件或文件夹信息（注意是path只能一一对应，并且无法获取到时不会报错，而是返回的info里没有对应的文件或文件夹时errno为-9，外层为0）
 func (f *Fs) GetFileMetas(ctx context.Context, path []string, needDownLink bool, needTextLink bool) (itemList []*api.Item, resp *http.Response, err error) {
 	opts, err := f.api.GetFileMetas(path, needDownLink, needTextLink)
@@ -241,6 +247,14 @@ func (f *Fs) UploadFileReturnId(ctx context.Context, in io.Reader, src fs.Object
 		}
 		return object, object.id, nil
 	}
+}
+
+func (f *Fs) RemoveFileFromId(ctx context.Context, fileId string, size int64) error {
+	if size <= sliceSize {
+		err := f.DeleteDirOrFile(ctx, fileId)
+		return err
+	}
+	return nil
 }
 
 func (f *Fs) UploadFileReturnRapidInfo(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (*fs.FileFragInfo, fs.Object, error) {
@@ -545,10 +559,6 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, loc
 	}
 	return info.Data, preCreateFileData, nil
 }
-
-const uploadBlockSize = 1024 * 1024 * 4
-const sliceSize = 1024 * 256
-const offsetSize = 1024 * 256
 
 // PreCreate {"path":"/test/999/111/1234.exe","return_type":1,"block_list":["5910a591dd8fc18c32a8f3df4fdc1761","a5fc157d78e6ad1c7e114b056c92821e"],"errno":0,"request_id":278285463311322051}
 // { "return_type": 2, "errno": 0, "info": { "md5": "5ddc05b01g7f6ae7d6adc90d912c983d", "category": 6, "fs_id": 166064416325948, "request_id": 280244028406040000, "from_type": 1, "size": 112060240, "isdir": 0, "mtime": 1713672326, "ctime": 1713672326, "path": "/test/999/111/1234_20240421_120525.exe" }, "request_id": 280244028406040573 }

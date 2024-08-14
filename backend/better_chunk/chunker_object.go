@@ -47,6 +47,14 @@ type ChunkFileInfo struct {
 
 // Open opens the file for read.  Call Close() on the returned io.ReadCloser
 func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
+	rangeStart := 0
+	rangeEnd := o.Size() - 1
+	for _, option := range options {
+		if rangeOption, ok := option.(*fs.RangeOption); ok {
+			rangeStart = rangeOption.Start
+			rangeEnd = rangeOption.End
+		}
+	}
 	baseFileRead, err := o.Object.Open(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -171,12 +179,39 @@ func (o Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, opt
 }
 
 // Remove Removes this object
-func (o Object) Remove(ctx context.Context) error {
+func (o Object) Remove(ctx context.Context) (err error) {
 	object, err := o.fs.FileStructure.NewObject(ctx, o.remote)
 	if err != nil {
 		return err
 	}
-	return object.Remove(ctx)
+	readCloser, err := object.Open(ctx, nil)
+	if err != nil {
+		return err
+	}
+	bytes, err := io.ReadAll(readCloser)
+	if err != nil {
+		return err
+	}
+	var chunkFileInfo ChunkFileInfo
+	if err = json.Unmarshal(bytes, &chunkFileInfo); err != nil {
+		return err
+	}
+	fragInfos := chunkFileInfo.List
+	for _, info := range fragInfos {
+		fileIdOperator, ok := o.fs.FileStore.(fs.FileIdOperator)
+		if ok && info.Id != "" {
+			err = fileIdOperator.RemoveFileFromId(ctx, info.Id, info.Size)
+		} else {
+			fileStoreObject, err1 := o.fs.FileStore.NewObject(ctx, info.Path)
+			if err1 != nil {
+				err = err1
+			} else {
+				err = fileStoreObject.Remove(ctx)
+			}
+		}
+	}
+	err = object.Remove(ctx)
+	return err
 }
 
 func NewObject(o fs.Object, fs Fs) (*Object, error) {
