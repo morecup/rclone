@@ -47,12 +47,12 @@ type ChunkFileInfo struct {
 
 // Open opens the file for read.  Call Close() on the returned io.ReadCloser
 func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
-	rangeStart := 0
-	rangeEnd := o.Size() - 1
+	var rangeStart int64 = 0
+	var rangeEnd int64 = o.Size() - 1
 	for _, option := range options {
 		if rangeOption, ok := option.(*fs.RangeOption); ok {
 			rangeStart = rangeOption.Start
-			rangeEnd = rangeOption.End
+			rangeEnd = min(rangeOption.End, rangeEnd)
 		}
 	}
 	baseFileRead, err := o.Object.Open(ctx, nil)
@@ -81,13 +81,28 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	sort.Slice(fileFragList, func(i, j int) bool {
 		return fileFragList[i].Part < fileFragList[j].Part
 	})
+	startPart := rangeStart / MaxSliceSize
+	startOffset := rangeStart % MaxSliceSize
+	endPart := rangeEnd / MaxSliceSize
+	endOffset := rangeEnd % MaxSliceSize
 	var allReaderCloser []io.ReadCloser
 	if fileIdOperator, ok := fileStore.(fs.FileIdOperator); ok {
 		fileRapidOperator, isRepidMode := fileStore.(fs.FileRapidOperator)
-		for _, fileFragInfo := range fileFragList {
+		for i, fileFragInfo := range fileFragList {
+			if int64(i) < startPart || int64(i) > endPart {
+				continue
+			}
+			//var fragOffsetBegin int64 = 0
+			var fragOffsetEnd int64 = MaxSliceSize - 1
+			//if int64(i) == startPart {
+			//	fragOffsetBegin = startOffset
+			//}
+			if int64(i) == endPart {
+				fragOffsetEnd = endOffset
+			}
 			var readCloser io.ReadCloser
 			if isRepidMode {
-				readCloser, err = fileRapidOperator.DownFileRapid(ctx, *fileFragInfo, -1, -1)
+				readCloser, err = fileRapidOperator.DownFileRapid(ctx, *fileFragInfo, 0, 58+fragOffsetEnd)
 				if readCloser != nil {
 					allReaderCloser = append(allReaderCloser, readCloser)
 				}
@@ -95,7 +110,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 			id := fileFragInfo.Id
 			if id != "" {
 				if !isRepidMode {
-					readCloser, err = fileIdOperator.DownFileFromId(ctx, fileFragInfo.Id, -1, -1)
+					readCloser, err = fileIdOperator.DownFileFromId(ctx, fileFragInfo.Id, 0, 58+fragOffsetEnd)
 					if err != nil {
 						return nil, err
 					}
@@ -139,8 +154,14 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 		if _, err = io.ReadFull(readerCloser, lenBuf); err != nil {
 			return nil, err
 		}
+
 		length := int32(binary.LittleEndian.Uint32(lenBuf))
 		readerList[i] = io.LimitReader(readerCloser, int64(length))
+		if i == 0 {
+			if _, err = io.CopyN(io.Discard, readerList[i], startOffset); err != nil {
+				return nil, err
+			}
+		}
 		closerList[i] = readerCloser
 	}
 	mutiReadCloser := readers.NewMutiReadCloser(readerList, closerList)
