@@ -542,7 +542,7 @@ func (f *Fs) UploadFile(ctx context.Context, in io.Reader, localCtime int64, loc
 			n = remaining
 		}
 		//seg := io.LimitReader(reader, n)
-		fs.Debugf(f, "Uploading segment %d/%d size %d", position, size, n)
+		fs.Debugf(f, "Uploading segment %d/%d size %d path %s", position, size, n, path)
 		_, err := f.uploadFragment(ctx, path, uploadId, partSeq, position, size, reader, n)
 		//if(info.Md5)
 		if err != nil {
@@ -668,18 +668,19 @@ func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, lo
 
 func (f *Fs) uploadFragment(ctx context.Context, path string, uploadId string, partseq int, start int64, totalSize int64, chunk io.ReadSeeker, chunkSize int64, options ...fs.OpenOption) (info *api.FragmentVO, err error) {
 	//var skip = int64(0)
-	_, _ = chunk.Seek(start, io.SeekStart)
-	realChunkSize := min(chunkSize, totalSize-start)
-	opts, err := f.api.Superfile2(path, uploadId, partseq, realChunkSize, io.LimitReader(chunk, chunkSize), options...)
-	if err != nil {
-		return nil, err
-	}
+
 	//toSend := chunkSize - skip
 	//opts.ContentLength = &toSend
 	//opts.ContentRange = fmt.Sprintf("bytes %d-%d/%d", start+skip, min(start+chunkSize-1, totalSize-1), totalSize)
 
 	info = new(api.FragmentVO)
 	err = f.pacer.Call(func() (bool, error) {
+		_, _ = chunk.Seek(start, io.SeekStart)
+		realChunkSize := min(chunkSize, totalSize-start)
+		opts, err := f.api.Superfile2(path, uploadId, partseq, realChunkSize, io.LimitReader(chunk, chunkSize), options...)
+		if err != nil {
+			return false, err
+		}
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
 	})

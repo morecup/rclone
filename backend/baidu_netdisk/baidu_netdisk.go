@@ -377,7 +377,7 @@ func (f *Fs) Root() string {
 
 // String converts this Fs to a string
 func (f *Fs) String() string {
-	return fmt.Sprintf("OneDrive root '%s'", f.root)
+	return fmt.Sprintf("baidu netdisk root '%s'", f.root)
 }
 
 // Features returns the optional features of this Fs
