@@ -16,6 +16,7 @@ import (
 	"github.com/rclone/rclone/fs/operations"
 	"io"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -72,7 +73,7 @@ func (f Fs) Root() string {
 }
 
 func (f Fs) String() string {
-	return fmt.Sprintf("Baidu Photo Chunked '%s:%s'", f.name, f.root)
+	return fmt.Sprintf("better chunk Chunked '%s:%s'", f.name, f.root)
 }
 
 func (f Fs) Precision() time.Duration {
@@ -219,6 +220,35 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 	} else {
 		return f.FileStructure.Features().DirMove(ctx, srcRealFs.FileStructure, srcRemote, dstRemote)
 	}
+}
+
+// Copy src to this remote using server-side copy operations.
+//
+// This is stored with the remote path given.
+//
+// It returns the destination Object and a possible error.
+//
+// Will only be called if src.Fs().Name() == f.Name()
+//
+// If it isn't possible then return fs.ErrorCantCopy
+func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	srcObj, ok := src.(*Object)
+	if !ok {
+		fs.Debugf(src, "Can't copy - not same remote type")
+		return nil, fs.ErrorCantCopy
+	}
+	dir, fileName := path.Split(remote)
+	fixedRemote := strings.ReplaceAll(filepath.Join(dir, strconv.FormatInt(srcObj.size, 10)+"￥}"+fileName), "\\", "/")
+	object, err := srcObj.fs.FileStructure.Features().Copy(ctx, srcObj.Object, fixedRemote)
+	if err != nil {
+		return nil, err
+	}
+	newObject, err := NewObject(object, *f)
+	if err != nil {
+		return nil, err
+	}
+
+	return newObject, nil
 }
 
 // About gets quota information from the Fs
