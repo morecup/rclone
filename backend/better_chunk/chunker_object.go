@@ -106,16 +106,15 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 				if readCloser != nil {
 					allReaderCloser = append(allReaderCloser, readCloser)
 				}
+				continue
 			}
 			id := fileFragInfo.Id
 			if id != "" {
-				if !isRepidMode {
-					readCloser, err = fileIdOperator.DownFileFromId(ctx, fileFragInfo.Id, 0, 58+fragOffsetEnd)
-					if err != nil {
-						return nil, err
-					}
-					allReaderCloser = append(allReaderCloser, readCloser)
+				readCloser, err = fileIdOperator.DownFileFromId(ctx, fileFragInfo.Id, 0, 58+fragOffsetEnd)
+				if err != nil {
+					return nil, err
 				}
+				allReaderCloser = append(allReaderCloser, readCloser)
 			} else {
 				object, err := fileStore.NewObject(ctx, fileFragInfo.Path)
 				if err != nil {

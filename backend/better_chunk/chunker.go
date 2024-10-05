@@ -127,17 +127,52 @@ func (f Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 	return NewObject(object, f)
 }
 
+// src.Size()可能为-1
+func (f Fs) PutStream(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
+	return f.Put(ctx, in, src, options...)
+}
+
 func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
 	//	1.先收集所有信息
 	//	将in拆分成很多片
-	allSize := src.Size()
-	remainSize := allSize
+	srcObject, readFromObject := src.(fs.Object)
 	fileFragInfoList := make([]*fs.FileFragInfo, 0)
+	var allSize int64
+	if !readFromObject {
+		allSize = 0
+	} else {
+		allSize = src.Size()
+	}
+	saveSize := int64(0)
 	i := 0
-	for remainSize > 0 {
-		sliceSize := remainSize
-		if remainSize > MaxSliceSize {
-			sliceSize = MaxSliceSize
+	for {
+		var sliceSize int64
+		if !readFromObject {
+			sliceBuffer := make([]byte, MaxSliceSize)
+			sliceSizeO, err := in.Read(sliceBuffer)
+			if err != nil && err != io.EOF {
+				return nil, err
+			} else if err == io.EOF {
+				break
+			}
+			sliceSize = int64(sliceSizeO)
+			allSize += sliceSize
+			in = bytes.NewBuffer(sliceBuffer)
+		} else {
+			if saveSize >= allSize {
+				break
+			}
+			sliceSize = min(allSize-saveSize, MaxSliceSize)
+			option := &fs.RangeOption{
+				Start: saveSize,
+				End:   saveSize + sliceSize - 1,
+			}
+			readCloser, err := srcObject.Open(ctx, option)
+			if err != nil {
+				return nil, err
+			}
+			in = readCloser
+			saveSize += sliceSize
 		}
 		bmpReader, beforeSize, afterSize := ToBmpReader(in, sliceSize)
 		remote := strings.Replace(uuid.New().String(), "-", "", -1)
@@ -176,8 +211,6 @@ func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ..
 			}
 		}
 		fileFragInfoList = append(fileFragInfoList, fileFragInfo)
-
-		remainSize -= sliceSize
 		i += 1
 	}
 	//	2.在上传到文件架构的文件中（记得remote需要含有￥}）
