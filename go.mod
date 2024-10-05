@@ -197,7 +197,6 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230923063757-afb1ddc0824c
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/panjf2000/ants/v2 v2.10.0
 	github.com/pkg/xattr v0.4.9
 	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b
 	golang.org/x/term v0.16.0
