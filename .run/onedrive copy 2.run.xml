@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="chunker copy" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="onedrive copy 2" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="copy D:\1\test.txt baiduchunk:\test -vv" />
+    <parameters value="copy --verbose --transfers 4 --checkers 8 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list &quot;OneDrive_local:\1\test.txt&quot; D:\aria2down -vv" />
     <envs>
       <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
       <env name="http_proxy" value="http://127.0.0.1:8888" />

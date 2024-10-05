@@ -3,7 +3,7 @@
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
     <go_parameters value="-tags &quot;cmount&quot;" />
-    <parameters value="mount baidupan:/test R: --cache-dir D:\OneDrive --vfs-cache-mode writes -vv" />
+    <parameters value="mount baidupan:/ R: --cache-dir D:\OneDrive --vfs-cache-mode writes -vv" />
     <kind value="PACKAGE" />
     <package value="github.com/rclone/rclone" />
     <directory value="$PROJECT_DIR$" />

@@ -318,6 +318,9 @@ func (f *Fs) ListDirFilesPage(ctx context.Context, path string, page int, num in
 		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
 		return shouldRetry(ctx, resp, err)
 	})
+	if info.Errno == -9 {
+		return make([]*api.Item, 0), resp, nil
+	}
 	if err != nil {
 		return nil, nil, err
 	}

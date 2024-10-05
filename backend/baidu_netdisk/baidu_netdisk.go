@@ -346,7 +346,9 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	//if root is file path,fix root to dir path
 	item, _, err := f.GetFileMeta(ctx, "/"+f.root, false, false)
-	if err != nil {
+	if errors.Is(err, fs.ErrorObjectNotFound) {
+		return f, nil
+	} else if err != nil {
 		return nil, err
 	}
 	if item.IsDir == 0 {
