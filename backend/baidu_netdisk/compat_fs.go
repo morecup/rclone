@@ -496,6 +496,7 @@ const offsetSize = 1024 * 256
 // PreCreate {"path":"/test/999/111/1234.exe","return_type":1,"block_list":["5910a591dd8fc18c32a8f3df4fdc1761","a5fc157d78e6ad1c7e114b056c92821e"],"errno":0,"request_id":278285463311322051}
 // { "return_type": 2, "errno": 0, "info": { "md5": "5ddc05b01g7f6ae7d6adc90d912c983d", "category": 6, "fs_id": 166064416325948, "request_id": 280244028406040000, "from_type": 1, "size": 112060240, "isdir": 0, "mtime": 1713672326, "ctime": 1713672326, "path": "/test/999/111/1234_20240421_120525.exe" }, "request_id": 280244028406040573 }
 // return_type 1 无法秒传，准备上传 2 秒传成功 3 文件已存在（仅一刻相册，在百度网盘中只会返回2）
+// 文件名中不能包含?|"><:*等特殊字符
 func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, localCtime int64, localMtime int64, size int64, path string) (preCreateFileData *api.PreCreateFileData, info *api.PreCreateVO, err error) {
 	//reader := readers.NewRepeatableReader(in)
 	_, err = reader.Seek(0, io.SeekStart)

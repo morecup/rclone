@@ -258,7 +258,21 @@ func NewObjectInfoWrapper(objectInfo fs.ObjectInfo, remote string, size int64) *
 // But for unknown-sized objects (indicated by src.Size() == -1), Upload should either
 // return an error or update the object properly (rather than e.g. calling panic).
 func (o Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
-	panic("implement me")
+	err := o.Remove(ctx)
+	if err != nil {
+		return err
+	}
+	object, err := o.fs.Put(ctx, in, src, options...)
+	if err != nil {
+		return err
+	}
+	chunkerObject := object.(*Object)
+	o.size = chunkerObject.size
+	o.remoteReal = chunkerObject.remoteReal
+	o.remote = chunkerObject.remote
+	o.fs = chunkerObject.fs
+	o.Object = chunkerObject.Object
+	return nil
 }
 
 // Remove Removes this object
@@ -267,32 +281,34 @@ func (o Object) Remove(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	readCloser, err := object.Open(ctx, nil)
-	if err != nil {
-		return err
-	}
-	bytes, err := io.ReadAll(readCloser)
-	if err != nil {
-		return err
-	}
-	var chunkFileInfo ChunkFileInfo
-	if err = json.Unmarshal(bytes, &chunkFileInfo); err != nil {
-		return err
-	}
-	fragInfos := chunkFileInfo.List
-	for _, info := range fragInfos {
-		fileIdOperator, ok := o.fs.FileStore.(fs.FileIdOperator)
-		if ok && info.Id != "" {
-			err = fileIdOperator.RemoveFileFromId(ctx, info.Id, info.Size)
-		} else {
-			fileStoreObject, err1 := o.fs.FileStore.NewObject(ctx, info.Path)
-			if err1 != nil {
-				err = err1
+	/*
+		readCloser, err := object.Open(ctx, nil)
+		if err != nil {
+			return err
+		}
+		bytes, err := io.ReadAll(readCloser)
+		if err != nil {
+			return err
+		}
+		var chunkFileInfo ChunkFileInfo
+		if err = json.Unmarshal(bytes, &chunkFileInfo); err != nil {
+			return err
+		}
+		fragInfos := chunkFileInfo.List
+		for _, info := range fragInfos {
+			fileIdOperator, ok := o.fs.FileStore.(fs.FileIdOperator)
+			if ok && info.Id != "" {
+				err = fileIdOperator.RemoveFileFromId(ctx, info.Id, info.Size)
 			} else {
-				err = fileStoreObject.Remove(ctx)
+				fileStoreObject, err1 := o.fs.FileStore.NewObject(ctx, info.Path)
+				if err1 != nil {
+					err = err1
+				} else {
+					err = fileStoreObject.Remove(ctx)
+				}
 			}
 		}
-	}
+	*/
 	err = object.Remove(ctx)
 	return err
 }
