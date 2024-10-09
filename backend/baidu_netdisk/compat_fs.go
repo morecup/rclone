@@ -328,8 +328,9 @@ func (f *Fs) ListDirFilesPage(ctx context.Context, path string, page int, num in
 }
 
 func (f *Fs) ListDirAllFiles(ctx context.Context, path string) (itemList []*api.Item, err error) {
+	i := 1
 	for {
-		list, _, err := f.ListDirFilesPage(ctx, path, 1, 1000)
+		list, _, err := f.ListDirFilesPage(ctx, path, i, 1000)
 		itemList = append(itemList, list...)
 		if err != nil {
 			return nil, err
@@ -337,6 +338,7 @@ func (f *Fs) ListDirAllFiles(ctx context.Context, path string) (itemList []*api.
 		if len(list) != 1000 {
 			break
 		}
+		i++
 	}
 	return itemList, nil
 }

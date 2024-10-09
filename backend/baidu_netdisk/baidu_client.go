@@ -97,6 +97,12 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 	if err != nil {
 		return resp, err
 	}
+	//命中接口频控
+	if response.GetErrno() == 31034 {
+		duration := time.Second * time.Duration(2)
+		time.Sleep(duration)
+		return b.CallJSONIgnore(ctx, opts, request, response, ignoreList)
+	}
 
 	if response.GetErrno() != 0 && ignoreList != nil {
 		for _, ignoreErrno := range ignoreList {
