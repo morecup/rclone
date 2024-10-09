@@ -469,10 +469,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeAsterisk) { // *
 			switch r {
 			case '*':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＊':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -480,10 +481,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeLtGt) { // <>
 			switch r {
 			case '<', '>':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＜', '＞':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -491,10 +493,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeSquareBracket) { // []
 			switch r {
 			case '[', ']':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '［', '］':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -502,10 +505,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeSemicolon) { // ;
 			switch r {
 			case ';':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '；':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -513,10 +517,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeQuestion) { // ?
 			switch r {
 			case '?':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '？':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -524,10 +529,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeColon) { // :
 			switch r {
 			case ':':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '：':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -535,10 +541,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodePipe) { // |
 			switch r {
 			case '|':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '｜':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -546,10 +553,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeDoubleQuote) { // "
 			switch r {
 			case '"':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＂':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -557,10 +565,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeSingleQuote) { // '
 			switch r {
 			case '\'':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＇':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -568,10 +577,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeBackQuote) { // `
 			switch r {
 			case '`':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '｀':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -579,10 +589,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeDollar) { // $
 			switch r {
 			case '$':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＄':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -590,10 +601,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeSlash) { // /
 			switch r {
 			case '/':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '／':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -601,10 +613,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeBackSlash) { // \
 			switch r {
 			case '\\':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＼':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -623,10 +636,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodeHash) { // #
 			switch r {
 			case '#':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '＃':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -634,10 +648,11 @@ func (mask MultiEncoder) Encode(in string) string {
 		if mask.Has(EncodePercent) { // %
 			switch r {
 			case '%':
+				out.WriteRune(QuoteRune)
 				out.WriteRune(r + fullOffset)
 				continue
 			case '％':
-				out.WriteRune(QuoteRune)
+				//out.WriteRune(QuoteRune)
 				out.WriteRune(r)
 				continue
 			}
@@ -889,9 +904,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＊':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -900,9 +915,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＜', '＞':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -911,9 +926,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '［', '］':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -922,9 +937,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '；':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -933,9 +948,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '？':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -944,9 +959,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '：':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -955,9 +970,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '｜':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -966,9 +981,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＂':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -977,9 +992,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＇':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -988,9 +1003,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '｀':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -999,9 +1014,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＄':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -1010,9 +1025,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '／': // FULLWIDTH SOLIDUS
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -1021,9 +1036,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＼': // FULLWIDTH REVERSE SOLIDUS
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -1043,9 +1058,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '＃':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
@@ -1054,9 +1069,9 @@ func (mask MultiEncoder) Decode(in string) string {
 			switch r {
 			case '％':
 				if unquote {
-					out.WriteRune(r)
-				} else {
 					out.WriteRune(r - fullOffset)
+				} else {
+					out.WriteRune(r)
 				}
 				continue
 			}
