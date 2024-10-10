@@ -88,6 +88,23 @@ func Stack(o interface{}, info string) {
 	fs.LogPrintf(fs.LogLevelDebug, o, "%s\nStack trace:\n%s", info, buf)
 }
 
+// MultiWriter是一个自定义的Writer，它可以将输出同时写入多个Writer，例如文件和标准输出。
+type MultiWriter struct {
+	Writers []io.Writer
+}
+
+// Write将给定的字节切片写入所有的Writer。
+// 如果写入时发生错误，它会返回第一个遇到的错误。
+func (mw *MultiWriter) Write(p []byte) (n int, err error) {
+	for _, w := range mw.Writers {
+		n, err = w.Write(p)
+		if err != nil {
+			return
+		}
+	}
+	return len(p), nil
+}
+
 // InitLogging start the logging as per the command line flags
 func InitLogging() {
 	flagsStr := "," + Opt.Format + ","
@@ -124,8 +141,12 @@ func InitLogging() {
 		if err != nil {
 			fs.Errorf(nil, "Failed to seek log file to end: %v", err)
 		}
-		log.SetOutput(f)
-		logrus.SetOutput(f)
+		// 创建一个MultiWriter，它将日志输出到标准输出和文件。
+		mw := &MultiWriter{
+			Writers: []io.Writer{f, os.Stdout},
+		}
+		log.SetOutput(mw)
+		logrus.SetOutput(mw)
 		redirectStderr(f)
 	}
 
