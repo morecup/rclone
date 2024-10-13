@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="chunker copy error (2)" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <output_file path="$PROJECT_DIR$/../../../../bald/log.log" is_save="true" />
+    <module name="rclone" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="copy &quot;G:\1\👍&quot; baiduchunk:test/ -vv" />
+    <envs>
+      <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
+      <env name="http_proxy" value="http://127.0.0.1:8888" />
+      <env name="HTTPS_PROXY" value="http://127.0.0.1:8888" />
+      <env name="https_proxy" value="http://127.0.0.1:8888" />
+    </envs>
+    <kind value="PACKAGE" />
+    <package value="github.com/rclone/rclone" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/rclone.go" />
+    <output_directory value="$PROJECT_DIR$/build" />
+    <method v="2" />
+  </configuration>
+</component>

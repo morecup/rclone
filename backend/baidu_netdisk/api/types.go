@@ -96,7 +96,7 @@ type FileManagerParam struct {
 	Path    string `json:"path,omitempty"`
 	NewName string `json:"newname,omitempty"`
 	Dest    string `json:"dest,omitempty"`
-	Ondup   string `json:"ondup,omitempty"`
+	Ondup   string `json:"ondup,omitempty"` //全局ondup,遇到重复文件的处理策略, fail(默认，直接返回失败)、newcopy(重命名文件)、overwrite(原来的文件夹内容会消失)、skip
 }
 
 type RapidOffsetData struct {

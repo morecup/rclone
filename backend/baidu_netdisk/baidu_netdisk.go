@@ -555,6 +555,12 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 		srcAbsolutePath := srcFs.ToAbsolutePath(srcRemote)
 		srcParentDir, _ := SplitPath(srcAbsolutePath)
 		dstParentDir, dstDirName := SplitPath(f.ToAbsolutePath(dstRemote))
+		_, _, err := f.GetFileMeta(ctx, f.ToAbsolutePath(dstRemote), true, true)
+		//如果目标路径不存在文件或者文件夹，才能进行重命名和移动文件夹
+		if !errors.Is(err, fs.ErrorObjectNotFound) {
+			fs.Debugf(f.ToAbsolutePath(dstRemote), "Can't move directory - destination already exists")
+			return fs.ErrorDirExists
+		}
 		if srcParentDir == dstParentDir {
 			// need to rename
 			err := f.RenameDirOrFile(ctx, api.FileManagerParam{Path: srcAbsolutePath, NewName: dstDirName})
