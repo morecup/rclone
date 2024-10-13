@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/backend/baidu_netdisk/api"
 	"github.com/rclone/rclone/fs"
+	"github.com/rclone/rclone/fs/config"
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/configstruct"
 	"github.com/rclone/rclone/fs/config/obscure"
@@ -112,6 +113,18 @@ should not exceed 250M (262,144,000 bytes) else you may encounter \"Microsoft.Sh
 Note that the chunks will be buffered into memory.`,
 			Default:  defaultChunkSize,
 			Advanced: true,
+		}, {
+			Name: config.ConfigEncoding,
+			Help: config.ConfigEncodingHelp,
+			Default: encoder.Display |
+				encoder.EncodeBackSlash |
+				encoder.EncodeLeftSpace |
+				encoder.EncodeLeftTilde |
+				encoder.EncodeRightPeriod |
+				encoder.EncodeRightSpace |
+				encoder.EncodeWin |
+				encoder.EncodeFourByteUtf8 |
+				encoder.EncodeInvalidUtf8,
 		}},
 	})
 }
@@ -281,7 +294,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	f := &Fs{
 		name:     name,
-		root:     root,
+		root:     opt.Enc.FromStandardPath(filepath.ToSlash(root)),
 		opt:      *opt,
 		ci:       ci,
 		UserId:   opt.UserID,
@@ -360,7 +373,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		if item.IsDir == 0 {
 			return nil, fmt.Errorf("path is not a right path.root:(%s)", f.root)
 		} else {
-			f.root = dir
+			f.root = opt.Enc.FromStandardPath(filepath.ToSlash(dir))
 			return f, fs.ErrorIsFile
 		}
 	}
@@ -374,12 +387,12 @@ func (f *Fs) Name() string {
 
 // Root of the remote (as passed into NewFs)
 func (f *Fs) Root() string {
-	return f.root
+	return f.opt.Enc.ToStandardPath(filepath.ToSlash(f.root))
 }
 
 // String converts this Fs to a string
 func (f *Fs) String() string {
-	return fmt.Sprintf("baidu netdisk root '%s'", f.root)
+	return fmt.Sprintf("baidu netdisk root '%s'", f.Root())
 }
 
 // Features returns the optional features of this Fs
@@ -437,7 +450,7 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 		return nil, err
 	}
 	object, ok := entry.(*Object)
-	object.remote = remote
+	object.remote = f.opt.Enc.FromStandardPath(remote)
 	if !ok {
 		return nil, errors.WithStack(fs.ErrorObjectNotFound)
 	}
@@ -460,20 +473,6 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 	}
 	object, err := f.NewObjectFromBaseItem(baseItem)
 	return object, err
-}
-
-func (f *Fs) buildObject(ctx context.Context, remote string, modTime time.Time, size int64) (o *Object) {
-	return &Object{
-		fs:            f,
-		remote:        remote,
-		hasMetaData:   true,
-		isOneNoteFile: false,
-		size:          size,
-		modTime:       modTime,
-		id:            "",
-		hash:          "md5",
-		mimeType:      "json",
-	}
 }
 
 func (f *Fs) Mkdir(ctx context.Context, dir string) error {
@@ -504,7 +503,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 			return nil, fs.ErrorCantMove
 		}
 		//now is same account
-		scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.remote)
+		scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.Remote())
 		srcParentFile, _ := SplitPath(scrAbsolutePath)
 		dstParentFile, dstDirName := SplitPath(f.ToAbsolutePath(remote))
 		if srcParentFile == dstParentFile {
@@ -609,7 +608,7 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		fs.Debugf(f, "Can't move files between drives (%q != %q)", srcObj.fs.UserId, srcObj.fs.UserId)
 		return nil, fs.ErrorCantMove
 	}
-	scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.remote)
+	scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.Remote())
 	//srcParentFile, _ := path.Split(scrAbsolutePath)
 	dstParentFile, dstDirName := SplitPath(f.ToAbsolutePath(remote))
 	fileManagerParam := api.FileManagerParam{
@@ -631,7 +630,7 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		dir = dir + "/"
 	}
 	if info.IsDir == 1 {
-		entry = fs.NewDir(dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
+		entry = NewDir(f, dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
 	} else if info.IsDir == 0 {
 		entry = &Object{
 			fs:            f,
@@ -668,8 +667,19 @@ func (f *Fs) NewObjectFromBaseItem(item *api.BaseItem) (*Object, error) {
 }
 
 func (f *Fs) ToAbsolutePath(relativePath string) string {
+	standardPath := strings.ReplaceAll(filepath.Join(f.root, relativePath), "\\", "/")
+	return f.opt.Enc.FromStandardPath(standardPath)
+}
+
+func (f *Fs) ToAbsolutePathFromStandard(relativePath string) string {
+	standardPath := strings.ReplaceAll(filepath.Join(f.root, relativePath), "\\", "/")
+	return f.opt.Enc.FromStandardPath(standardPath)
+}
+
+func (f *Fs) ToAbsolutePathFromNative(relativePath string) string {
 	return strings.ReplaceAll(filepath.Join(f.root, relativePath), "\\", "/")
 }
+
 func (f *Fs) ToAbsoluteFilePath(relativePath string, fileName string) string {
 	return strings.ReplaceAll(filepath.Join(f.root, relativePath, fileName), "\\", "/")
 }

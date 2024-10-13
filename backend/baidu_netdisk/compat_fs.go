@@ -256,7 +256,7 @@ func (f *Fs) DownFileSerial(ctx context.Context, path string, size int64, option
 }
 
 func (f *Fs) GetDownUrl(ctx context.Context, path string) (url string, err error) {
-	absolutePath := f.ToAbsolutePath(path)
+	absolutePath := f.ToAbsolutePathFromNative(path)
 	opts, err := f.api.GetLocateDownloadUrl(absolutePath)
 	if err != nil {
 		return "", err

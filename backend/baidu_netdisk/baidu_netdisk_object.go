@@ -7,6 +7,7 @@ import (
 	"github.com/rclone/rclone/fs/hash"
 	"io"
 	"net/http"
+	"path/filepath"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func (o *Object) String() string {
 
 // Remote returns the remote path
 func (o *Object) Remote() string {
-	return o.remote
+	return o.fs.opt.Enc.ToStandardPath(filepath.ToSlash(o.remote))
 }
 
 // Hash returns the SHA-1 of an object returning a lowercase hex string
@@ -86,7 +87,7 @@ func (o *Object) OpenOld(ctx context.Context, options ...fs.OpenOption) (in io.R
 		return nil, errors.New("can't open a OneNote file")
 	}
 	fs.FixRangeOption(options, o.size)
-	resp, err := o.fs.DownFileDisguiseBaiduClient(ctx, o.fs.ToAbsolutePath(o.remote), options)
+	resp, err := o.fs.DownFileDisguiseBaiduClient(ctx, o.fs.ToAbsolutePathFromNative(o.remote), options)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 
 // Remove an object
 func (o *Object) Remove(ctx context.Context) error {
-	err := o.fs.DeleteDirOrFile(ctx, o.fs.ToAbsolutePath(o.remote))
+	err := o.fs.DeleteDirOrFile(ctx, o.fs.ToAbsolutePathFromNative(o.remote))
 	return err
 }
 
