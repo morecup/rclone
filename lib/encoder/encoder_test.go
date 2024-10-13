@@ -431,3 +431,10 @@ func restoreReservedChars(in string) string {
 		return c
 	}, in)
 }
+
+func TestFromStandardName(t *testing.T) {
+	encode := EncodeFourByteUtf8.Encode("👍")
+	fmt.Printf(encode)
+	decode := EncodeFourByteUtf8.Decode(encode)
+	assert.Equal(t, "👍", decode)
+}

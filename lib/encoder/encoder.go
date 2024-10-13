@@ -63,6 +63,7 @@ const (
 	EncodeDot                                    // . and .. names
 	EncodeSquareBracket                          // []
 	EncodeSemicolon                              // ;
+	EncodeFourByteUtf8                           // 👍
 
 	// Synthetic
 	EncodeWin         = EncodeColon | EncodeQuestion | EncodeDoubleQuote | EncodeAsterisk | EncodeLtGt | EncodePipe // :?"*<>|
@@ -303,6 +304,12 @@ func (mask MultiEncoder) Encode(in string) string {
 			case 0, '␀', QuoteRune, utf8.RuneError:
 				return true
 			}
+			if mask.Has(EncodeFourByteUtf8) {
+				runeLen := utf8.RuneLen(r)
+				if runeLen == 4 {
+					return true
+				}
+			}
 			if mask.Has(EncodeAsterisk) { // *
 				switch r {
 				case '*',
@@ -463,6 +470,13 @@ func (mask MultiEncoder) Encode(in string) string {
 				// append the real bytes instead of utf8.RuneError
 				_, l := utf8.DecodeRuneInString(in[i:])
 				out.WriteString(in[i : i+l])
+				continue
+			}
+		}
+		if mask.Has(EncodeFourByteUtf8) {
+			runeLen := utf8.RuneLen(r)
+			if runeLen == 4 {
+				appendQuotedBytes(&out, in[i:i+4])
 				continue
 			}
 		}
@@ -1099,6 +1113,12 @@ func (mask MultiEncoder) Decode(in string) string {
 		}
 		if unquote {
 			if mask.Has(EncodeInvalidUtf8) {
+				skipNext = appendUnquotedByte(&out, in[i:])
+				if skipNext {
+					continue
+				}
+			}
+			if mask.Has(EncodeFourByteUtf8) {
 				skipNext = appendUnquotedByte(&out, in[i:])
 				if skipNext {
 					continue
