@@ -479,6 +479,10 @@ func (f *Fs) Mkdir(ctx context.Context, dir string) error {
 	err := f.CreateDirForce(ctx, f.ToAbsolutePath(dir))
 	return err
 }
+func (f *Fs) Purge(ctx context.Context, dir string) error {
+	err := f.DeleteDirOrFile(ctx, f.ToAbsolutePath(dir))
+	return err
+}
 
 func (f *Fs) Rmdir(ctx context.Context, dir string) error {
 	err := f.DeleteDirOrFile(ctx, f.ToAbsolutePath(dir))

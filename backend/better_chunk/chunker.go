@@ -292,6 +292,10 @@ func (f Fs) Mkdir(ctx context.Context, dir string) error {
 	return f.FileStructure.Mkdir(ctx, dir)
 }
 
+func (f *Fs) Purge(ctx context.Context, dir string) error {
+	return f.FileStructure.Features().Purge(ctx, dir)
+}
+
 // 只删除文件夹，不用删除文件夹内的文件
 func (f Fs) Rmdir(ctx context.Context, dir string) error {
 	return f.FileStructure.Rmdir(ctx, dir)
