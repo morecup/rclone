@@ -23,6 +23,10 @@ type Object struct {
 	fs Fs
 }
 
+func (o Object) String() string {
+	return o.Remote()
+}
+
 func (o Object) Remote() string {
 	if o.remoteReal == "" {
 		parts := strings.SplitN(path.Base(o.remote), "￥}", 2)
@@ -53,9 +57,12 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	for _, option := range options {
 		if rangeOption, ok := option.(*fs.RangeOption); ok {
 			rangeStart = rangeOption.Start
-			rangeEnd = min(rangeOption.End, rangeEnd)
+			if rangeOption.End != -1 {
+				rangeEnd = min(rangeOption.End, rangeEnd)
+			}
 		}
 	}
+	fs.Infof(o, "========== %d - %d ==========", rangeStart/1024/1024, rangeEnd/1024/1024)
 	baseFileRead, err := o.Object.Open(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -102,8 +109,8 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	errChan := make(chan error, 1) // 用于错误传递的channel
 
 	j := -1
-
-	var allReaderCloser = make([]io.ReadCloser, min(int64(len(fileFragList)-1), endPart)-max(0, startPart)+1)
+	minValue := min(int64(len(fileFragList)-1), endPart)
+	var allReaderCloser = make([]io.ReadCloser, minValue-max(0, startPart)+1)
 	if fileIdOperator, ok := fileStore.(fs.FileIdOperator); ok {
 		fileRapidOperator, isRepidMode := fileStore.(fs.FileRapidOperator)
 		for i, fileFragInfo := range fileFragList {
