@@ -265,10 +265,10 @@ func NewObjectInfoWrapper(objectInfo fs.ObjectInfo, remote string, size int64) *
 // But for unknown-sized objects (indicated by src.Size() == -1), Upload should either
 // return an error or update the object properly (rather than e.g. calling panic).
 func (o Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) error {
-	err := o.Remove(ctx)
-	if err != nil {
-		return err
-	}
+	//err := o.Remove(ctx)
+	//if err != nil {
+	//	return err
+	//}
 	object, err := o.fs.Put(ctx, in, src, options...)
 	if err != nil {
 		return err
