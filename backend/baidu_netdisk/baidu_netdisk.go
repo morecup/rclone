@@ -634,7 +634,7 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		dir = dir + "/"
 	}
 	if info.IsDir == 1 {
-		entry = NewDir(f, dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
+		entry = NewDir(f, dir+info.ServerFilename, time.Unix(info.ServerMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
 	} else if info.IsDir == 0 {
 		entry = &Object{
 			fs:            f,
@@ -642,7 +642,7 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 			hasMetaData:   true,
 			isOneNoteFile: false,
 			size:          info.Size,
-			modTime:       time.Unix(info.LocalMtime, 0),
+			modTime:       time.Unix(info.ServerMtime, 0),
 			id:            strconv.Itoa(int(info.FsID)),
 			hash:          "md5",
 			mimeType:      "json",
