@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="chunker error 2" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <output_file path="$PROJECT_DIR$/../../../../bald/log.log" />
+    <module name="rclone" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="cat baiduchunk:test/test1.mp4" />
+    <kind value="PACKAGE" />
+    <package value="github.com/rclone/rclone" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/rclone.go" />
+    <output_directory value="$PROJECT_DIR$/build" />
+    <method v="2" />
+  </configuration>
+</component>

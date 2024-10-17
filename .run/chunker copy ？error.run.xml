@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="mount baidu chunk" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="chunker copy ？error" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <output_file path="$PROJECT_DIR$/../../../../bald/log.log" is_save="true" />
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
-    <go_parameters value="-tags &quot;cmount&quot;" />
-    <parameters value="mount baiduchunk:\ R: --cache-dir D:\OneDrive --vfs-cache-mode full --vfs-cache-max-age 2h --log-level DEBUG" />
+    <parameters value="copy --verbose --transfers 10 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list &quot;G:\1\test？a.txt&quot; baiduchunk:G/ -vv" />
     <envs>
       <env name="HTTP_PROXY" value="http://127.0.0.1:8888" />
       <env name="http_proxy" value="http://127.0.0.1:8888" />
