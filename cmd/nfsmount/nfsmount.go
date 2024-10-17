@@ -1,5 +1,4 @@
 //go:build unix
-// +build unix
 
 // Package nfsmount implements mounting functionality using serve nfs command
 //
@@ -32,11 +31,12 @@ func init() {
 	cmd.Annotations["status"] = "Experimental"
 	mountlib.AddRc(name, mount)
 	cmdFlags := cmd.Flags()
-	flags.BoolVarP(cmdFlags, &sudo, "sudo", "", sudo, "Use sudo to run the mount command as root.", "")
+	flags.BoolVarP(cmdFlags, &sudo, "sudo", "", sudo, "Use sudo to run the mount/umount commands as root.", "")
+	nfs.AddFlags(cmdFlags)
 }
 
 func mount(VFS *vfs.VFS, mountpoint string, opt *mountlib.Options) (asyncerrors <-chan error, unmount func() error, err error) {
-	s, err := nfs.NewServer(context.Background(), VFS, &nfs.Options{})
+	s, err := nfs.NewServer(context.Background(), VFS, &nfs.Opt)
 	if err != nil {
 		return
 	}
@@ -56,6 +56,7 @@ func mount(VFS *vfs.VFS, mountpoint string, opt *mountlib.Options) (asyncerrors 
 	options := []string{
 		"-o", fmt.Sprintf("port=%s", port),
 		"-o", fmt.Sprintf("mountport=%s", port),
+		"-o", "tcp",
 	}
 	for _, option := range opt.ExtraOptions {
 		options = append(options, "-o", option)
@@ -68,7 +69,7 @@ func mount(VFS *vfs.VFS, mountpoint string, opt *mountlib.Options) (asyncerrors 
 	}
 	cmd = append(cmd, "mount")
 	cmd = append(cmd, options...)
-	cmd = append(cmd, "localhost:", mountpoint)
+	cmd = append(cmd, "localhost:"+opt.VolumeName, mountpoint)
 	fs.Debugf(nil, "Running mount command: %q", cmd)
 
 	out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
@@ -79,12 +80,20 @@ func mount(VFS *vfs.VFS, mountpoint string, opt *mountlib.Options) (asyncerrors 
 	}
 	asyncerrors = errChan
 	unmount = func() error {
+		if s.UnmountedExternally {
+			return nil
+		}
 		var umountErr error
 		var out []byte
 		if runtime.GOOS == "darwin" {
 			out, umountErr = exec.Command("diskutil", "umount", "force", mountpoint).CombinedOutput()
 		} else {
-			out, umountErr = exec.Command("umount", "-f", mountpoint).CombinedOutput()
+			cmd := []string{}
+			if sudo {
+				cmd = append(cmd, "sudo")
+			}
+			cmd = append(cmd, "umount", "-f", mountpoint)
+			out, umountErr = exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
 		}
 		shutdownErr := s.Shutdown()
 		VFS.Shutdown()
@@ -96,5 +105,12 @@ func mount(VFS *vfs.VFS, mountpoint string, opt *mountlib.Options) (asyncerrors 
 		}
 		return nil
 	}
+
+	nfs.OnUnmountFunc = func() {
+		s.UnmountedExternally = true
+		errChan <- nil
+		VFS.Shutdown()
+	}
+
 	return
 }
