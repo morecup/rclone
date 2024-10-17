@@ -31,6 +31,10 @@ func NewDir(fs *Fs, remote string, modTime time.Time) *Dir {
 	}
 }
 
+func (d *Dir) Fs() fs.Info {
+	return d.fs
+}
+
 // String returns the name
 func (d *Dir) String() string {
 	return d.remote
