@@ -268,7 +268,12 @@ func (o *Option) String() string {
 		// The default Go encoding can't be decoded uniquely
 		return CommaSepList(stringArray).String()
 	}
-	return fmt.Sprint(v)
+	// 带有详细信息的字符串，转换时能够确保精度正确
+	if do, ok := v.(interface{ PreciseString() string }); ok {
+		return do.PreciseString()
+	} else {
+		return fmt.Sprint(v)
+	}
 }
 
 // Set an Option from a string

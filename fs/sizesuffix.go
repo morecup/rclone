@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,6 +71,15 @@ func (x SizeSuffix) string() (string, string) {
 	return fmt.Sprintf("%.3f", scaled), suffix
 }
 
+// 带有详细信息的字符串，转换时能够精度正确
+func (x SizeSuffix) PreciseString() string {
+	s, s2 := x.string()
+	if strings.ToLower(s) == "off" {
+		return s
+	}
+	return s + "(" + strconv.FormatInt(int64(x), 10) + ")" + s2
+}
+
 // String turns SizeSuffix into a string
 func (x SizeSuffix) String() string {
 	val, suffix := x.string()
@@ -132,6 +142,19 @@ func (x *SizeSuffix) Set(s string) error {
 	if strings.ToLower(s) == "off" {
 		*x = -1
 		return nil
+	}
+	// 创建正则表达式，匹配括号内的数字
+	re := regexp.MustCompile(`\((\d+)\)`)
+	match := re.FindStringSubmatch(s)
+	// 检查是否有匹配
+	if len(match) > 1 {
+		// match[0] 是整个匹配，match[1] 是第一个括号内的匹配
+		fmt.Println("提取的数字是：", match[1])
+		num, err := strconv.ParseInt(match[1], 10, 64)
+		if err == nil {
+			*x = SizeSuffix(num)
+			return nil
+		}
 	}
 	suffix := s[len(s)-1]
 	suffixLen := 1
