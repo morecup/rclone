@@ -89,10 +89,10 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	sort.Slice(fileFragList, func(i, j int) bool {
 		return fileFragList[i].Part < fileFragList[j].Part
 	})
-	startPart := rangeStart / MaxSliceSize
-	startOffset := rangeStart % MaxSliceSize
-	endPart := rangeEnd / MaxSliceSize
-	endOffset := rangeEnd % MaxSliceSize
+	startPart := rangeStart / CanUseSliceSize
+	startOffset := rangeStart % CanUseSliceSize
+	endPart := rangeEnd / CanUseSliceSize
+	endOffset := rangeEnd % CanUseSliceSize
 
 	// 使用context.WithCancel创建可取消的上下文
 	ctxCancel, cancel := context.WithCancel(ctx)
@@ -118,7 +118,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 				continue
 			}
 			//var fragOffsetBegin int64 = 0
-			var fragOffsetEnd int64 = MaxSliceSize - 1
+			var fragOffsetEnd int64 = CanUseSliceSize - 1
 			//if int64(i) == startPart {
 			//	fragOffsetBegin = startOffset
 			//}

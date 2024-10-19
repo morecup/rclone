@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	MaxSliceSize = 1024 * 1024 * 29
+	MaxSliceSize    = 1024 * 1024 * 29
+	CanUseSliceSize = 30408704
 )
 
 func init() {
