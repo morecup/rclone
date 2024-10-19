@@ -148,8 +148,6 @@ func (x *SizeSuffix) Set(s string) error {
 	match := re.FindStringSubmatch(s)
 	// 检查是否有匹配
 	if len(match) > 1 {
-		// match[0] 是整个匹配，match[1] 是第一个括号内的匹配
-		fmt.Println("提取的数字是：", match[1])
 		num, err := strconv.ParseInt(match[1], 10, 64)
 		if err == nil {
 			*x = SizeSuffix(num)
