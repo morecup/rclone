@@ -77,7 +77,7 @@ func (x SizeSuffix) PreciseString() string {
 	if strings.ToLower(s) == "off" {
 		return s
 	}
-	return s + "(" + strconv.FormatInt(int64(x), 10) + ")" + s2
+	return s + s2 + "(" + strconv.FormatInt(int64(x), 10) + ")"
 }
 
 // String turns SizeSuffix into a string
