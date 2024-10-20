@@ -144,7 +144,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	endOffset := rangeEnd % CanUseSliceSize
 
 	// 使用context.WithCancel创建可取消的上下文
-	ctxCancel, cancel := context.WithCancel(ctx)
+	ctxCancel, cancel := context.WithCancel(context.Background())
 	defer cancel() // 确保所有路径都调用cancel
 
 	// 并发控制channel，限制同时下载的数量
@@ -181,8 +181,11 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 
 			j += 1
 
+			//fs.Infof(o, "rangestart %d - rangeend %d %d", rangeStart, rangeEnd, j)
+
 			// 运行下载goroutine
 			go func(fileFragInfo *fs.FileFragInfo, j int, fragOffsetEnd int64) {
+				//fs.Infof(o, "1rangestart %d - rangeend %d %d", rangeStart, rangeEnd, j)
 				defer wg.Done()
 				defer func() { <-semaphore }() // 释放并发槽
 
@@ -192,7 +195,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 					return
 				default:
 				}
-
+				//fs.Infof(o, "2rangestart %d - rangeend %d %d", rangeStart, rangeEnd, j)
 				var goErr error
 
 				defer func() {
@@ -211,7 +214,11 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 					if goErr != nil {
 						return
 					}
+					if readCloser == nil {
+						fs.Infof("", "err readCloser")
+					}
 					if readCloser != nil {
+						fs.Infof(o, "rangestart %d - rangeend %d %d:%v", rangeStart, rangeEnd, j, readCloser)
 						mu.Lock()
 						allReaderCloser[j] = readCloser
 						mu.Unlock()

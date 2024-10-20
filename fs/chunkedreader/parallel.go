@@ -183,14 +183,13 @@ func (cr *parallel) _open() (err error) {
 	for i := len(cr.streams); i < cr.nstreams; i++ {
 		// clip to length of file
 		chunkSize := cr.chunkSize
-		uploadSize := chunkSize - cr.endStream%chunkSize
-		newEndStream := cr.endStream + uploadSize
+		chunkSize = chunkSize - cr.endStream%chunkSize
+		newEndStream := cr.endStream + chunkSize
 		if newEndStream > size {
 			chunkSize = size - cr.endStream
 			newEndStream = cr.endStream + chunkSize
 		}
-
-		s, err := cr.newStream(cr.ctx, cr.endStream, uploadSize)
+		s, err := cr.newStream(cr.ctx, cr.endStream, chunkSize)
 		if err != nil {
 			return err
 		}
