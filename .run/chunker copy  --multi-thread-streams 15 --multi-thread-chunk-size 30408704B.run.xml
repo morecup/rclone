@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="chunker copy  --multi-thread-streams 15 --multi-thread-chunk-size 30408704B" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <output_file path="$PROJECT_DIR$/../../../../bald/log.log" is_save="true" />
+    <module name="rclone" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="copy baiduchunk:13600kf/G/GMEM-105/kcf9.com@GMEM-105.mp4 D:\test --fast-list --create-empty-src-dirs --transfers 10 --checkers 10 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --verbose --stats 1s --stats-file-name-length 0 --multi-thread-streams 15 --multi-thread-chunk-size 30408704B --multi-thread-cutoff 30408704B -vv" />
+    <kind value="PACKAGE" />
+    <package value="github.com/rclone/rclone" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/rclone.go" />
+    <output_directory value="$PROJECT_DIR$/build" />
+    <method v="2" />
+  </configuration>
+</component>
