@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	patrickmnCache "github.com/patrickmn/go-cache"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/cache"
 	"github.com/rclone/rclone/fs/config/configmap"
@@ -60,11 +61,12 @@ type Options struct {
 
 // Fs represents a wrapped fs.Fs
 type Fs struct {
-	name          string
-	root          string
-	FileStructure fs.Fs
-	FileStore     fs.Fs
-	features      *fs.Features // optional features
+	name           string
+	root           string
+	FileStructure  fs.Fs
+	FileStore      fs.Fs
+	features       *fs.Features // optional features
+	ChunkInfoCache *patrickmnCache.Cache
 }
 
 func (f Fs) Name() string {
@@ -393,10 +395,11 @@ func NewFs(ctx context.Context, name, rpath string, m configmap.Mapper) (fs.Fs, 
 	}
 
 	f := &Fs{
-		name:          name,
-		root:          rpath,
-		FileStructure: fileStructureRemote,
-		FileStore:     fileStoreRemote,
+		name:           name,
+		root:           rpath,
+		FileStructure:  fileStructureRemote,
+		FileStore:      fileStoreRemote,
+		ChunkInfoCache: patrickmnCache.New(10*time.Minute, 20*time.Minute),
 	}
 	//cache.PinUntilFinalized(f.FileStructure, f)
 	//cache.PinUntilFinalized(fileStoreRemote, f)

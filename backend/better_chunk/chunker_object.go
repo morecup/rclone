@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/pkg/errors"
 	"github.com/rclone/rclone/fs"
+	"github.com/rclone/rclone/fs/fspath"
 	"github.com/rclone/rclone/lib/readers"
 	"io"
 	"path"
@@ -19,6 +21,7 @@ type Object struct {
 	remoteReal string
 	remote     string
 	size       int64
+	mu         sync.RWMutex
 	fs.Object
 	fs Fs
 }
@@ -50,6 +53,28 @@ type ChunkFileInfo struct {
 	List     []*fs.FileFragInfo `json:"list"`
 }
 
+var muMap sync.Map
+
+// Lock 对给定键加锁
+func Lock(key string) {
+	// 尝试从sync.Map中获取锁，如果不存在，则创建一个新的
+	actual, _ := muMap.LoadOrStore(key, &sync.Mutex{})
+	mtx := actual.(*sync.Mutex)
+	mtx.Lock()
+	//fmt.Printf("Locking %s, Mutex address: %p\n", key, mtx)
+	//fs.Infof(muMap, "Locking %s", key)
+}
+
+// Unlock 对给定键解锁
+func Unlock(key string) {
+	actual, exists := muMap.Load(key)
+	if !exists {
+		return // 如果锁不存在，则直接返回
+	}
+	mtx := actual.(*sync.Mutex)
+	mtx.Unlock()
+}
+
 // Open opens the file for read.  Call Close() on the returned io.ReadCloser
 func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
 	var rangeStart int64 = 0
@@ -63,26 +88,50 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 		}
 	}
 	fs.Infof(o, "========== %d - %d ==========", rangeStart/1024/1024, rangeEnd/1024/1024)
-	baseFileRead, err := o.Object.Open(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	data, err := io.ReadAll(baseFileRead)
-	if err != nil {
-		return nil, err
-	}
-	// 关闭 ReadCloser
-	defer func(baseFileRead io.ReadCloser) {
-		err := baseFileRead.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(baseFileRead)
-
-	// 将读取的内容反序列化为 JSON
+	var objectKey = o.fs.Name() + ":" + fspath.JoinRootPath(o.fs.root, o.Remote())
 	var chunkFileInfo ChunkFileInfo
-	if err := json.Unmarshal(data, &chunkFileInfo); err != nil {
-		return nil, err
+	cacheValue, found := o.fs.ChunkInfoCache.Get(objectKey)
+	if !found {
+		Lock(objectKey)
+		cacheValue, found = o.fs.ChunkInfoCache.Get(objectKey)
+		if !found {
+			baseFileRead, err := o.Object.Open(ctx, nil)
+			// 关闭 ReadCloser
+			defer func(baseFileRead io.ReadCloser) {
+				err := baseFileRead.Close()
+				if err != nil {
+					panic(err)
+				}
+			}(baseFileRead)
+			if err != nil {
+				Unlock(objectKey)
+				return nil, err
+			}
+			data, err := io.ReadAll(baseFileRead)
+			if err != nil {
+				Unlock(objectKey)
+				return nil, err
+			}
+			if err := json.Unmarshal(data, &chunkFileInfo); err != nil {
+				Unlock(objectKey)
+				return nil, err
+			}
+			o.fs.ChunkInfoCache.SetDefault(objectKey, chunkFileInfo)
+			Unlock(objectKey)
+		} else {
+			Unlock(objectKey)
+			if chunk, ok := cacheValue.(ChunkFileInfo); ok {
+				chunkFileInfo = chunk
+			} else {
+				return nil, errors.Errorf("error cache value: %v", cacheValue)
+			}
+		}
+	} else {
+		if chunk, ok := cacheValue.(ChunkFileInfo); ok {
+			chunkFileInfo = chunk
+		} else {
+			return nil, errors.Errorf("error cache value: %v", cacheValue)
+		}
 	}
 	fileStore := o.fs.FileStore
 	fileFragList := chunkFileInfo.List
@@ -158,7 +207,10 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 
 				var readCloser io.ReadCloser
 				if isRepidMode {
-					readCloser, err = fileRapidOperator.DownFileRapid(ctx, *fileFragInfo, 0, 58+fragOffsetEnd)
+					readCloser, goErr = fileRapidOperator.DownFileRapid(ctx, *fileFragInfo, 0, 58+fragOffsetEnd)
+					if goErr != nil {
+						return
+					}
 					if readCloser != nil {
 						mu.Lock()
 						allReaderCloser[j] = readCloser
@@ -214,6 +266,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 	closerList := make([]io.Closer, len(allReaderCloser))
 	for i, readerCloser := range allReaderCloser {
 		// 跳过前54字节
+		var err error
 		if _, err = io.CopyN(io.Discard, readerCloser, 54); err != nil {
 			return nil, err
 		}
