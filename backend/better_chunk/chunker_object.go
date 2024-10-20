@@ -87,7 +87,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 			}
 		}
 	}
-	fs.Infof(o, "========== %d - %d ==========", rangeStart/1024/1024, rangeEnd/1024/1024)
+	fs.Infof(o, "open ========== %s - %s ==========", fs.SizeSuffix(rangeStart).PreciseString(), fs.SizeSuffix(rangeEnd).PreciseString())
 	var objectKey = o.fs.Name() + ":" + fspath.JoinRootPath(o.fs.root, o.Remote())
 	var chunkFileInfo ChunkFileInfo
 	cacheValue, found := o.fs.ChunkInfoCache.Get(objectKey)
