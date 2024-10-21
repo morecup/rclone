@@ -13,12 +13,12 @@ import (
 
 	"github.com/anacrolix/dms/soap"
 
-	"github.com/rclone/rclone/fs/config/configfile"
-	"github.com/rclone/rclone/vfs"
+	"github.com/morecup/rclone/fs/config/configfile"
+	"github.com/morecup/rclone/vfs"
 
-	_ "github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/cmd/serve/dlna/dlnaflags"
-	"github.com/rclone/rclone/fs"
+	_ "github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/cmd/serve/dlna/dlnaflags"
+	"github.com/morecup/rclone/fs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -98,7 +98,7 @@ func TestServeContent(t *testing.T) {
 
 // Check that ContentDirectory#Browse returns appropriate metadata on the root container.
 func TestContentDirectoryBrowseMetadata(t *testing.T) {
-	// Sample from: https://github.com/rclone/rclone/issues/3253#issuecomment-524317469
+	// Sample from: https://github.com/morecup/rclone/issues/3253#issuecomment-524317469
 	req, err := http.NewRequest("POST", baseURL+serviceControlURL, strings.NewReader(`
 <?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"

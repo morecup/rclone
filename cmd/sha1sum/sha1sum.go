@@ -4,10 +4,10 @@ package sha1sum
 import (
 	"context"
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/cmd/hashsum"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/operations"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/cmd/hashsum"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/operations"
 	"github.com/spf13/cobra"
 )
 

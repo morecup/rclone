@@ -5,7 +5,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="move --verbose --transfers 10 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list baiduchunk:G/ baiduchunk:13600kf/G/" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <output_directory value="$PROJECT_DIR$/build" />

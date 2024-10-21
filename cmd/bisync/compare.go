@@ -8,11 +8,11 @@ import (
 	mutex "sync"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/lib/terminal"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/accounting"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/lib/terminal"
 )
 
 // CompareOpt describes the Compare options in force

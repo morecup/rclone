@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/cache"
-	"github.com/rclone/rclone/fs/filter"
-	"github.com/rclone/rclone/fstest/mockfs"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/cache"
+	"github.com/morecup/rclone/fs/filter"
+	"github.com/morecup/rclone/fstest/mockfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -5,14 +5,14 @@ import (
 	_ "embed"
 	"strings"
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/cmd/serve/proxy/proxyflags"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/flags"
-	"github.com/rclone/rclone/fs/hash"
-	httplib "github.com/rclone/rclone/lib/http"
-	"github.com/rclone/rclone/vfs"
-	"github.com/rclone/rclone/vfs/vfsflags"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/cmd/serve/proxy/proxyflags"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/flags"
+	"github.com/morecup/rclone/fs/hash"
+	httplib "github.com/morecup/rclone/lib/http"
+	"github.com/morecup/rclone/vfs"
+	"github.com/morecup/rclone/vfs/vfsflags"
 	"github.com/spf13/cobra"
 )
 

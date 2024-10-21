@@ -7,10 +7,10 @@ import (
 	"time"
 
 	smb2 "github.com/cloudsoda/go-smb2"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/config/obscure"
-	"github.com/rclone/rclone/fs/fshttp"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/accounting"
+	"github.com/morecup/rclone/fs/config/obscure"
+	"github.com/morecup/rclone/fs/fshttp"
 )
 
 // dial starts a client connection to the given SMB server. It is a

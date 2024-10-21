@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/filter"
-	"github.com/rclone/rclone/lib/cache"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/filter"
+	"github.com/morecup/rclone/lib/cache"
 )
 
 var (

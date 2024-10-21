@@ -3,7 +3,7 @@
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <method v="2" />

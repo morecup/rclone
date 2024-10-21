@@ -5,8 +5,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/rc"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/rc"
 )
 
 func init() {

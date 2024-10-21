@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 )
 
 // Implement the sshClient interface for external ssh programs

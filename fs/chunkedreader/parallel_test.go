@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/rclone/rclone/fstest/mockobject"
-	"github.com/rclone/rclone/lib/multipart"
+	"github.com/morecup/rclone/fstest/mockobject"
+	"github.com/morecup/rclone/lib/multipart"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

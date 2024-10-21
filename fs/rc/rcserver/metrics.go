@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/morecup/rclone/fs/accounting"
+	"github.com/morecup/rclone/fs/fshttp"
+	"github.com/morecup/rclone/fs/rc"
+	"github.com/morecup/rclone/fs/rc/jobs"
+	libhttp "github.com/morecup/rclone/lib/http"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/fshttp"
-	"github.com/rclone/rclone/fs/rc"
-	"github.com/rclone/rclone/fs/rc/jobs"
-	libhttp "github.com/rclone/rclone/lib/http"
 )
 
 const path = "/metrics"

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/config/configstruct"
-	"github.com/rclone/rclone/lib/errcount"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configstruct"
+	"github.com/morecup/rclone/lib/errcount"
 )
 
 // Registry of filesystems

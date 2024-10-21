@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/rclone/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configmap"
 	"net"
 	"net/http"
 	"net/url"

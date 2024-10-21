@@ -71,7 +71,7 @@ Run `rclone config` to setup. See [rclone config docs](/docs/) for more details.
     brew install rclone
 
 NOTE: This version of rclone will not support `mount` any more (see
-[#5373](https://github.com/rclone/rclone/issues/5373)). If mounting is wanted
+[#5373](https://github.com/morecup/rclone/issues/5373)). If mounting is wanted
 on macOS, either install a precompiled binary or enable the relevant option
 when [installing from source](#source).
 
@@ -338,7 +338,7 @@ You can get it from your package manager, or download it from
 [golang.org/dl](https://golang.org/dl/). Then you can run the following:
 
 ```
-git clone https://github.com/rclone/rclone.git
+git clone https://github.com/morecup/rclone.git
 cd rclone
 go build
 ```
@@ -389,7 +389,7 @@ This can be done from the build command, by adding to the `-ldflags`
 argument value as shown below.
 
 ```
-go build -trimpath -ldflags "-s -X github.com/rclone/rclone/fs.Version=v9.9.9-test" -tags cmount
+go build -trimpath -ldflags "-s -X github.com/morecup/rclone/fs.Version=v9.9.9-test" -tags cmount
 ```
 
 On Windows, the official executables also have the version information,
@@ -434,8 +434,8 @@ make GOTAGS=cmount
 There are other make targets that can be used for more advanced builds,
 such as cross-compiling for all supported os/architectures, and packaging
 results into release artifacts.
-See [Makefile](https://github.com/rclone/rclone/blob/master/Makefile)
-and [cross-compile.go](https://github.com/rclone/rclone/blob/master/bin/cross-compile.go)
+See [Makefile](https://github.com/morecup/rclone/blob/master/Makefile)
+and [cross-compile.go](https://github.com/morecup/rclone/blob/master/bin/cross-compile.go)
 for details.
 
 Another alternative method for source installation is to download the source,
@@ -445,7 +445,7 @@ executable will be in your GOPATH bin folder (`$(go env GOPATH)/bin`,
 which corresponds to `~/go/bin/rclone` by default).
 
 ```
-go install github.com/rclone/rclone@latest
+go install github.com/morecup/rclone@latest
 ```
 
 In some situations, rclone executable size might be too big for deployment
@@ -597,7 +597,7 @@ into its own launcher service, as kind of "child services". This has the additio
 advantage that it also implements a network provider that integrates into
 Windows standard methods for managing network drives. This is currently not
 officially supported by Rclone, but with WinFsp version 2019.3 B2 / v1.5B2 or later
-it should be possible through path rewriting as described [here](https://github.com/rclone/rclone/issues/3340).
+it should be possible through path rewriting as described [here](https://github.com/morecup/rclone/issues/3340).
 
 ##### Third-party service integration
 

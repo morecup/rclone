@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/fs/hash"
 	"github.com/putdotio/go-putio/putio"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/fs/hash"
 )
 
 // Object describes a Putio object

@@ -5,7 +5,7 @@
     <go_parameters value="-tags &quot;cmount&quot;" />
     <parameters value="serve sftp OneDrive_local:\ --addr :7437 --user 123 --pass 123 -vv" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <output_directory value="$PROJECT_DIR$/build" />

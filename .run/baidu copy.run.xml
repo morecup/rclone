@@ -4,7 +4,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="copy baidupan:\test\test_6.txt baidupan:\2 -vv" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <output_directory value="$PROJECT_DIR$/build" />

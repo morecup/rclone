@@ -5,7 +5,7 @@
     <go_parameters value="-tags &quot;cmount&quot;" />
     <parameters value="mount baiduchunk:\ R: --cache-dir D:\OneDrive --vfs-cache-mode full --vfs-cache-max-age 2h  --vfs-read-chunk-streams 15 --vfs-read-chunk-size 30408704B --log-level DEBUG" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <output_directory value="$PROJECT_DIR$/build" />

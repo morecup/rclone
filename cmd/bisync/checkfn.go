@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rclone/rclone/backend/crypt"
-	"github.com/rclone/rclone/cmd/bisync/bilib"
-	"github.com/rclone/rclone/cmd/check"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/filter"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/operations"
+	"github.com/morecup/rclone/backend/crypt"
+	"github.com/morecup/rclone/cmd/bisync/bilib"
+	"github.com/morecup/rclone/cmd/check"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/accounting"
+	"github.com/morecup/rclone/fs/filter"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/operations"
 )
 
 var hashType hash.Type

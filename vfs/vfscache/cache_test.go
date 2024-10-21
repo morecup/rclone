@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/rclone/rclone/backend/local" // import the local backend
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/lib/diskusage"
-	"github.com/rclone/rclone/vfs/vfscache/writeback"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	_ "github.com/morecup/rclone/backend/local" // import the local backend
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/lib/diskusage"
+	"github.com/morecup/rclone/vfs/vfscache/writeback"
+	"github.com/morecup/rclone/vfs/vfscommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

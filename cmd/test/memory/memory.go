@@ -6,10 +6,10 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/cmd/test"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/operations"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/cmd/test"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/operations"
 	"github.com/spf13/cobra"
 )
 

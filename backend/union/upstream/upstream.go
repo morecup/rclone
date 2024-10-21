@@ -12,11 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rclone/rclone/backend/union/common"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/cache"
-	"github.com/rclone/rclone/fs/fspath"
-	"github.com/rclone/rclone/fs/operations"
+	"github.com/morecup/rclone/backend/union/common"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/cache"
+	"github.com/morecup/rclone/fs/fspath"
+	"github.com/morecup/rclone/fs/operations"
 )
 
 var (

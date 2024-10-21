@@ -22,7 +22,7 @@ For business support or sponsorship enquiries please see:
 
 The project's repository is located at:
 
-- https://github.com/rclone/rclone
+- https://github.com/morecup/rclone
 
 There you can file bug reports or contribute with pull requests.
 

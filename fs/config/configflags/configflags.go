@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/flags"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fs/config/flags"
 	"github.com/spf13/pflag"
 )
 

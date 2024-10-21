@@ -5,9 +5,9 @@ import (
 	"sort"
 	"testing"
 
-	localBackend "github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/vfs"
+	localBackend "github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/vfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

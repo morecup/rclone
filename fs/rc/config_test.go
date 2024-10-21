@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

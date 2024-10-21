@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/rc"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/rc"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/vfs/vfscommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

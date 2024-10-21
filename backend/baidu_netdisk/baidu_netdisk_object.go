@@ -3,8 +3,8 @@ package baidu_netdisk
 import (
 	"context"
 	"errors"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/hash"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/hash"
 	"io"
 	"net/http"
 	"path/filepath"

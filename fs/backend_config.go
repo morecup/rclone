@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rclone/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configmap"
 )
 
 const (

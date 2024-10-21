@@ -5,12 +5,12 @@ import (
 	"math"
 	"strings"
 
-	"github.com/rclone/rclone/cmd/mountlib"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/fspath"
-	"github.com/rclone/rclone/fs/rc"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/cmd/mountlib"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/fspath"
+	"github.com/morecup/rclone/fs/rc"
+	"github.com/morecup/rclone/vfs/vfscommon"
 
 	"github.com/spf13/pflag"
 )

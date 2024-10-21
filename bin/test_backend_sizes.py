@@ -17,7 +17,7 @@ import re
 import sys
 import subprocess
 
-match_backend = re.compile(r'"github.com/rclone/rclone/backend/(.*?)"')
+match_backend = re.compile(r'"github.com/morecup/rclone/backend/(.*?)"')
 
 def read_backends():
     """
@@ -39,7 +39,7 @@ def write_all(orig_all, backend):
     """
     with open(all_backends, "w") as fd:
         for line in orig_all.split("\n"):
-            match = re.search(r'"github.com/rclone/rclone/backend/(.*?)"', line)
+            match = re.search(r'"github.com/morecup/rclone/backend/(.*?)"', line)
             # Comment out line matching backend
             if match and match.group(1) == backend:
                 line = "// " + line

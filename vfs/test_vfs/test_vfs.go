@@ -15,9 +15,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/lib/file"
-	"github.com/rclone/rclone/lib/random"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/lib/file"
+	"github.com/morecup/rclone/lib/random"
 )
 
 var (

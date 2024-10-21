@@ -6,12 +6,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/obscure"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/fstest/fstests"
-	"github.com/rclone/rclone/lib/kv"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/obscure"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/fstest/fstests"
+	"github.com/morecup/rclone/lib/kv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

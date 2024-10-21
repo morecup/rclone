@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/lib/oauthutil"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/lib/oauthutil"
 
 	"golang.org/x/oauth2"
 )

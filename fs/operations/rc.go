@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/rc"
-	"github.com/rclone/rclone/lib/diskusage"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/rc"
+	"github.com/morecup/rclone/lib/diskusage"
 )
 
 func init() {

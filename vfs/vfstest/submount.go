@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/cmd/mountlib"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/cache"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/lib/file"
-	"github.com/rclone/rclone/vfs"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/cmd/mountlib"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/cache"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/lib/file"
+	"github.com/morecup/rclone/vfs"
+	"github.com/morecup/rclone/vfs/vfscommon"
 )
 
 // Functions to run and control the mount subprocess

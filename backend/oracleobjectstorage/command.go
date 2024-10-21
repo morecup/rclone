@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/operations"
 	"github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/operations"
 )
 
 // ------------------------------------------------------------

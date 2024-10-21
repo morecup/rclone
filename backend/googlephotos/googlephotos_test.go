@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/lib/random"
+	_ "github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/lib/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

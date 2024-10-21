@@ -11,13 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/dirtree"
-	"github.com/rclone/rclone/fs/list"
-	"github.com/rclone/rclone/fs/log"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fs/walk"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/dirtree"
+	"github.com/morecup/rclone/fs/list"
+	"github.com/morecup/rclone/fs/log"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/fs/walk"
+	"github.com/morecup/rclone/vfs/vfscommon"
 	"golang.org/x/text/unicode/norm"
 )
 

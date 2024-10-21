@@ -32,21 +32,21 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/chunksize"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/config/configstruct"
-	"github.com/rclone/rclone/fs/config/obscure"
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/fs/fshttp"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/walk"
-	"github.com/rclone/rclone/lib/bucket"
-	"github.com/rclone/rclone/lib/encoder"
-	"github.com/rclone/rclone/lib/env"
-	"github.com/rclone/rclone/lib/multipart"
-	"github.com/rclone/rclone/lib/pacer"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/chunksize"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configstruct"
+	"github.com/morecup/rclone/fs/config/obscure"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/fs/fshttp"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/walk"
+	"github.com/morecup/rclone/lib/bucket"
+	"github.com/morecup/rclone/lib/encoder"
+	"github.com/morecup/rclone/lib/env"
+	"github.com/morecup/rclone/lib/multipart"
+	"github.com/morecup/rclone/lib/pacer"
 )
 
 const (
@@ -2179,7 +2179,7 @@ func (w *azChunkWriter) WriteChunk(ctx context.Context, chunkNumber int, reader 
 //
 // FIXME it would be nice to delete uncommitted blocks.
 //
-// See: https://github.com/rclone/rclone/issues/5583
+// See: https://github.com/morecup/rclone/issues/5583
 //
 // However there doesn't seem to be an easy way of doing this other than
 // by deleting the target.

@@ -12,10 +12,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/flags"
-	"github.com/rclone/rclone/lib/file"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/flags"
+	"github.com/morecup/rclone/lib/file"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 )

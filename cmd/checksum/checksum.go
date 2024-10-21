@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/cmd/check" // for common flags
-	"github.com/rclone/rclone/fs/config/flags"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/operations"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/cmd/check" // for common flags
+	"github.com/morecup/rclone/fs/config/flags"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/operations"
 	"github.com/spf13/cobra"
 )
 

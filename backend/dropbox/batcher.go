@@ -11,7 +11,7 @@ import (
 	"fmt"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/files"
-	"github.com/rclone/rclone/fs/fserrors"
+	"github.com/morecup/rclone/fs/fserrors"
 )
 
 // finishBatch commits the batch, returning a batch status to poll or maybe complete

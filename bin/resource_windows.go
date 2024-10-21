@@ -29,7 +29,7 @@ import (
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/josephspurrier/goversioninfo"
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 )
 
 func main() {

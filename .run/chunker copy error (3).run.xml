@@ -5,7 +5,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="copy --verbose --transfers 10 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list &quot;$PROJECT_DIR$/../../../../program Files/ToDesk/Logs/servicephqghume_2024_10_13.log&quot; baiduchunk:test/ -vv" />
     <kind value="PACKAGE" />
-    <package value="github.com/rclone/rclone" />
+    <package value="github.com/morecup/rclone" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/rclone.go" />
     <output_directory value="$PROJECT_DIR$/build" />
