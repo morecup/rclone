@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="chunker copy ？error" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="chunker copy 问号 error" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <output_file path="$PROJECT_DIR$/../../../../bald/log.log" is_save="true" />
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
