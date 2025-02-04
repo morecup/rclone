@@ -39,6 +39,9 @@ func (f *Fs) GetFileMetas(ctx context.Context, path []string, needDownLink bool,
 // GetFileMeta 返回单个文件或文件夹信息，经过处理
 func (f *Fs) GetFileMeta(ctx context.Context, path string, needDownLink bool, needTextLink bool) (item *api.Item, resp *http.Response, err error) {
 	itemList, resp, err := f.GetFileMetas(ctx, []string{path}, needDownLink, needTextLink)
+	if itemList == nil {
+		return nil, resp, fs.ErrorObjectNotFound
+	}
 	item = itemList[0]
 	if err != nil {
 		if item.Errno == -9 {
