@@ -104,7 +104,7 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 				return resp, nil
 			}
 		}
-		return resp, errors.WithStack(fmt.Errorf("opts: %+v,response error %d ,resp: %+v ,response body: %+v", opts, response.GetErrno(), resp, response))
+		return resp, errors.WithStack(fmt.Errorf("esponse error %d ,opts: %+v,rresp: %+v ,response body: %+v", response.GetErrno(), opts, resp, response))
 	}
 
 	return resp, nil
@@ -178,6 +178,11 @@ func shouldRetry(ctx context.Context, resp *http.Response, err error) (bool, err
 			retry = true
 			err = pacer.RetryAfterError(err, duration)
 			fs.Debugf(nil, "Should retry: %v", err)
+		case 408, 500:
+			duration := time.Second * time.Duration(2)
+			retry = true
+			err = pacer.RetryAfterError(err, duration)
+			fs.Debugf(nil, "two many request 408 http status: %v", err)
 		case 507: // Insufficient Storage
 			return false, fserrors.FatalError(err)
 		}
