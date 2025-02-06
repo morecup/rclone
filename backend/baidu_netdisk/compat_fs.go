@@ -48,6 +48,9 @@ func (f *Fs) GetFileMeta(ctx context.Context, path string, needDownLink bool, ne
 			return item, resp, fs.ErrorObjectNotFound
 		}
 	}
+	if item.Path != api.FixToBaiduPath(path) {
+		return nil, resp, fs.ErrorObjectNotFound
+	}
 	return item, resp, nil
 }
 
