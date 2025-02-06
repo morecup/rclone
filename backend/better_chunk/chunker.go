@@ -214,15 +214,21 @@ func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ..
 			objectInfoWrapper := NewObjectInfoWrapper(src, remote, sliceSize+beforeSize+afterSize)
 			var fileFragInfo *fs.FileFragInfo = nil
 			//	每一片去上传到文件存储的文件中
-			if fileRapidOperator, ok := f.FileStore.(fs.FileRapidOperator); ok {
-				fileFragInfo1, object, _ := fileRapidOperator.UploadFileReturnRapidInfo(ctx, bmpReader, objectInfoWrapper, options...)
+			if fileRapidOperator, ok1 := f.FileStore.(fs.FileRapidOperator); ok1 {
+				fileFragInfo1, object, err := fileRapidOperator.UploadFileReturnRapidInfo(ctx, bmpReader, objectInfoWrapper, options...)
+				if err != nil {
+					// 发生错误时，只发送第一个错误
+					once.Do(func() {
+						errChan <- err
+					})
+					return
+				}
 				fileFragInfo = fileFragInfo1
 				if fileFragInfo != nil {
 					fileFragInfo.Part = int32(i)
 					fileFragInfo.Path = object.Remote()
 				}
-			}
-			if fileIdOperator, ok := f.FileStore.(fs.FileIdOperator); ok && fileFragInfo == nil {
+			} else if fileIdOperator, ok := f.FileStore.(fs.FileIdOperator); ok && fileFragInfo == nil {
 				object, id, err := fileIdOperator.UploadFileReturnId(ctx, bmpReader, objectInfoWrapper, options...)
 				if err == nil {
 					fileFragInfo = &fs.FileFragInfo{
@@ -231,9 +237,14 @@ func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ..
 						Path: object.Remote(),
 						Id:   id,
 					}
+				} else {
+					// 发生错误时，只发送第一个错误
+					once.Do(func() {
+						errChan <- err
+					})
+					return
 				}
-			}
-			if fileFragInfo == nil {
+			} else {
 				object, err := f.FileStore.Put(ctx, bmpReader, objectInfoWrapper, options...)
 				if err != nil {
 					// 发生错误时，只发送第一个错误
