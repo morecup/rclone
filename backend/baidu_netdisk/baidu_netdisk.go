@@ -131,7 +131,7 @@ Note that the chunks will be buffered into memory.`,
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
 	bduss, _ := m.Get("BDUSS")
 	ptoken, _ := m.Get("PTOKEN")
-	fmt.Print(bduss, ptoken)
+	//fmt.Print(bduss, ptoken)
 	client := fshttp.NewClient(ctx)
 	cookieJar, _ := persistjar.New(&persistjar.Options{PublicSuffixList: publicsuffix.List}, m, "")
 
@@ -161,11 +161,11 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 				m.Set("BAIDUID", cookie.Value)
 			}
 		}
-		fmt.Println(" baidu pan login success!")
+		//fmt.Println(" baidu pan login success!")
 	} else {
-		fmt.Println(" baidu pan login fail! you may be needed to edit again!!")
+		return nil, fmt.Errorf("baidu pan login fail! you may be needed to edit again")
 	}
-	fmt.Println()
+	//fmt.Println()
 	return nil, nil
 }
 
