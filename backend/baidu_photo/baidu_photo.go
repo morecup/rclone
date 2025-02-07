@@ -39,6 +39,7 @@ const (
 var (
 	scopeAccess      = fs.SpaceSepList{"Files.Read", "Files.ReadWrite", "Files.Read.All", "Files.ReadWrite.All", "Sites.Read.All", "offline_access"}
 	QuickXorHashType hash.Type
+	cookieURL, _     = url.Parse("https://passport.baidu.com")
 )
 
 // Register with Fs
@@ -70,7 +71,6 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	client := fshttp.NewClient(ctx)
 	cookieJar, _ := persistjar.New(&persistjar.Options{PublicSuffixList: publicsuffix.List}, m, "")
 
-	cookieURL, _ := url.Parse("https://passport.baidu.com")
 	var cookies = []*http.Cookie{
 		{Name: "BDUSS", Value: bduss, Domain: ".baidu.com", Path: "/"},
 		{Name: "PTOKEN", Value: ptoken, Domain: ".passport.baidu.com", Path: "/"},
@@ -79,13 +79,19 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	cookieJar.SetCookies(cookieURL, cookies)
 	client.Jar = cookieJar
 
+	refreshToken(client, m)
+	fmt.Println()
+	return nil, nil
+}
+
+func refreshToken(client *http.Client, m configmap.Mapper) {
 	resp, _ := client.Get("https://photo.baidu.com/photo/web/login")
 	defer resp.Body.Close()
 	if strings.Contains(resp.Request.URL.String(), "https://photo.baidu.com/photo/web/home") {
 		// 读取响应体
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		bodyString := string(bodyBytes)
-		fmt.Println(bodyString)
+		//fmt.Println(bodyString)
 		//{bdstoken: '5652a36cd9ea59b34d59d81c7462f8c8', uk: '1102385300722'}
 		re := regexp.MustCompile(`bdstoken:\s*'([^']*)'`)
 		// 使用正则表达式查找匹配项
@@ -97,7 +103,7 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 		} else {
 			m.Set("bdstoken", "")
 		}
-		nowCookies := cookieJar.Cookies(cookieURL)
+		nowCookies := client.Jar.Cookies(cookieURL)
 		for _, cookie := range nowCookies {
 			if cookie.Name == "BDUSS" {
 				m.Set("BDUSS", cookie.Value)
@@ -111,8 +117,6 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	} else {
 		fmt.Println(" baidu photo login fail! you may be needed to edit again!!")
 	}
-	fmt.Println()
-	return nil, nil
 }
 
 // Options defines the configuration for this backend
@@ -208,6 +212,17 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	//netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;
 	transport.SetUserAgent("netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia")
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	refreshToken(client, m)
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		for {
+			select {
+			case <-ticker.C:
+				refreshToken(client, m)
+			}
+		}
+	}()
 	f := &Fs{
 		name:     name,
 		root:     root,
