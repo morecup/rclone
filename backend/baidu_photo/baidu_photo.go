@@ -67,7 +67,7 @@ func init() {
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
 	bduss, _ := m.Get("BDUSS")
 	ptoken, _ := m.Get("PTOKEN")
-	fmt.Print(bduss, ptoken)
+	//fmt.Print(bduss, ptoken)
 	client := fshttp.NewClient(ctx)
 	cookieJar, _ := persistjar.New(&persistjar.Options{PublicSuffixList: publicsuffix.List}, m, "")
 
@@ -79,12 +79,12 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	cookieJar.SetCookies(cookieURL, cookies)
 	client.Jar = cookieJar
 
-	refreshToken(client, m)
-	fmt.Println()
-	return nil, nil
+	err := refreshToken(client, m)
+	//fmt.Println()
+	return nil, err
 }
 
-func refreshToken(client *http.Client, m configmap.Mapper) {
+func refreshToken(client *http.Client, m configmap.Mapper) error {
 	resp, _ := client.Get("https://photo.baidu.com/photo/web/login")
 	defer resp.Body.Close()
 	if strings.Contains(resp.Request.URL.String(), "https://photo.baidu.com/photo/web/home") {
@@ -113,10 +113,11 @@ func refreshToken(client *http.Client, m configmap.Mapper) {
 				m.Set("BAIDUID", cookie.Value)
 			}
 		}
-		fmt.Println(" baidu photo login success!")
+		//fmt.Println(" baidu photo login success!")
 	} else {
-		fmt.Println(" baidu photo login fail! you may be needed to edit again!!")
+		return fmt.Errorf("baidu photo login fail! you may be needed to edit again")
 	}
+	return nil
 }
 
 // Options defines the configuration for this backend
