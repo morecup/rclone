@@ -95,7 +95,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 		Lock(objectKey)
 		cacheValue, found = o.fs.ChunkInfoCache.Get(objectKey)
 		if !found {
-			baseFileRead, err := o.Object.Open(ctx, nil)
+			baseFileRead, err := o.Object.Open(ctx)
 			// 关闭 ReadCloser
 			defer func(baseFileRead io.ReadCloser) {
 				err := baseFileRead.Close()
@@ -239,7 +239,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 					if goErr != nil {
 						return
 					}
-					readCloser1, goErr := object.Open(ctx, nil)
+					readCloser1, goErr := object.Open(ctx)
 					if goErr != nil {
 						return
 					}
@@ -255,7 +255,7 @@ func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadClos
 			if err != nil {
 				return nil, err
 			}
-			readCloser, err := object.Open(ctx, nil)
+			readCloser, err := object.Open(ctx)
 			if err != nil {
 				return nil, err
 			}
