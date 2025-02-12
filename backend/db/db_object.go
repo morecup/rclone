@@ -28,7 +28,7 @@ type Object struct {
 func NewObjectFromFileInfo(file *FileInfo, absolutePath string, f *Fs) *Object {
 	return &Object{
 		id:       file.Id,
-		parentId: file.ParentId,
+		parentId: *file.ParentId,
 		remote:   absolutePath,
 		modTime:  file.ModTime,
 		size:     file.FileSize,
@@ -129,7 +129,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		Content:  allByte,
 		ModTime:  src.ModTime(ctx),
 		IsDir:    false,
-		ParentId: o.parentId,
+		ParentId: &o.parentId,
 	}
 	result := o.fs.db.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
 	if result.Error != nil {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/rclone/rclone/backend/baidu_netdisk/api"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/configstruct"
@@ -168,25 +167,26 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	var retrievedFile FileInfo = rootDir
 
 	for i, segment := range segments {
-		var foundFile []FileInfo
-		tx := db.First(&foundFile, "name = ? and parentId = ?", segment, retrievedFile.Id)
+		var fileInfo FileInfo
+		tx := f.db.Where(FileInfo{ParentId: &retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+			IsDir:    true,
+			Name:     segment,
+			ParentId: &retrievedFile.Id,
+		})
 		if tx.Error != nil {
 			return nil, errors.Wrapf(tx.Error, "db find error")
 		}
-		if len(foundFile) != 1 {
-			return nil, errors.Errorf("found %d files in db. root (%s),segment (%s)", len(foundFile), root, segment)
-		}
 		if i == len(segments)-1 {
-			if !foundFile[0].IsDir {
+			if !fileInfo.IsDir {
 				//if root is file path,fix root to dir path
 				break
 			}
 		} else {
-			if !foundFile[0].IsDir {
+			if !fileInfo.IsDir {
 				return nil, errors.Errorf("expected to be a folder, but is a file. root (%s),segment (%s)", root, segment)
 			}
 		}
-		retrievedFile = foundFile[0]
+		retrievedFile = fileInfo
 	}
 
 	f.rootDirId = retrievedFile.Id
@@ -334,9 +334,6 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 	}
 	return NewObjectFromFileInfo(fileInfo, remote, f), nil
 }
-func (f *Fs) newObject(remote string) *Object {
-
-}
 
 // Put in to the remote path with the modTime given of the given size
 //
@@ -348,21 +345,59 @@ func (f *Fs) newObject(remote string) *Object {
 // will return the object and the error, otherwise will return
 // nil and the error
 func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
-	o := &Object{
-		id:       file.Id,
-		parentId: file.ParentId,
-		remote:   absolutePath,
-		modTime:  file.ModTime,
-		size:     file.FileSize,
-		fs:       f,
-		fileName: file.Name,
+	remote := src.Remote()
+	segments := pathToSegments(remote)
+	var parentFile FileInfo = FileInfo{
+		Id: f.rootDirId,
 	}
-	err2 := o.Update(ctx, in, src, options...)
-	baseItem, err := f.UploadFile(ctx, in, src.ModTime(ctx).Unix(), src.ModTime(ctx).Unix(), src.Size(), f.ToAbsolutePath(src.Remote()))
-	if err != nil {
-		return nil, err
+
+	for _, segment := range segments[:len(segments)-1] {
+		var fileInfo FileInfo
+		tx := f.db.Where(FileInfo{ParentId: &parentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+			IsDir:    true,
+			Name:     segment,
+			ParentId: &parentFile.Id,
+		})
+		if tx.Error != nil {
+			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+				return nil, errors.Wrapf(tx.Error, "db move error")
+			}
+		} else {
+			if !fileInfo.IsDir {
+				return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
+			}
+		}
+		parentFile = fileInfo
 	}
-	object, err := f.NewObjectFromBaseItem(baseItem)
+
+	var object *Object
+	var remoteFile FileInfo
+	tx := f.db.Where(FileInfo{ParentId: &parentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+	if tx.Error != nil {
+		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, errors.Wrapf(tx.Error, "db move error")
+		} else {
+			result := f.db.Create(&FileInfo{
+				Name:     segments[len(segments)-1],
+				FileSize: src.Size(),
+				IsDir:    false,
+				ModTime:  src.ModTime(ctx),
+				Content:  nil,
+				ParentId: &parentFile.Id,
+			})
+			if result.Error != nil {
+				return nil, errors.Wrap(result.Error, "db put error")
+			}
+		}
+	} else {
+		if remoteFile.IsDir {
+			return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
+		} else {
+			object = NewObjectFromFileInfo(&remoteFile, remote, f)
+		}
+	}
+	err := object.Update(ctx, in, src, options...)
+
 	return object, err
 }
 
@@ -453,7 +488,7 @@ func (f *Fs) Rmdir(ctx context.Context, dir string) error {
 //
 // Will only be called if src.Fs().Name() == f.Name()
 //
-// If it isn't possible then return fs.ErrorCantMove
+// If it isn't possible then return fs.ErrorCantMove remote:have file name and is relativePath
 func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
 	srcObj, ok := src.(*Object)
 	if ok {
@@ -464,47 +499,66 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		}
 		//now is same db
 		segments := pathToSegments(remote)
-		var retrievedFile FileInfo = FileInfo{
+		var dstParentFile FileInfo = FileInfo{
 			Id: f.rootDirId,
 		}
 
-		for _, segment := range segments {
+		for _, segment := range segments[:len(segments)-1] {
 			var fileInfo FileInfo
-			tx := f.db.Where(FileInfo{ParentId: &retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+			tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 				IsDir:    true,
 				Name:     segment,
-				ParentId: &retrievedFile.Id,
+				ParentId: &dstParentFile.Id,
 			})
 			if tx.Error != nil {
-				return errors.Wrapf(tx.Error, "db find error")
+				if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+					return nil, errors.Wrapf(tx.Error, "db move error")
+				}
+			} else {
+				if !fileInfo.IsDir {
+					return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
+				}
 			}
-			retrievedFile = fileInfo
+			dstParentFile = fileInfo
 		}
 
-		scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.Remote())
-		srcParentFile, _ := SplitPath(scrAbsolutePath)
-		dstParentFile, dstDirName := SplitPath(f.ToAbsolutePath(remote))
-		if srcParentFile == dstParentFile {
-			// need to rename
-			err := f.RenameDirOrFile(ctx, api.FileManagerParam{Path: scrAbsolutePath, NewName: dstDirName})
-			if err != nil {
-				return nil, err
+		var remoteFile FileInfo
+		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+		if tx.Error != nil {
+			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+				return nil, errors.Wrapf(tx.Error, "db move error")
 			}
-			srcObj.remote = remote
-			return srcObj, nil
 		} else {
-			fileManagerParam := api.FileManagerParam{
-				Path:    scrAbsolutePath,
-				Dest:    dstParentFile,
-				NewName: dstDirName,
+			if remoteFile.IsDir {
+				return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
+			} else {
+				//排除重命名操作时，两个路径相同的情况
+				if segments[len(segments)-1] != srcObj.fileName {
+					tx = f.db.Delete(&remoteFile)
+					if tx.Error != nil {
+						return nil, errors.Wrapf(tx.Error, "db move remoteFile delete error")
+					}
+				}
 			}
-			err := f.MoveOrCopyDirOrFile(ctx, fileManagerParam, api.MoveOperate)
-			if err != nil {
-				return nil, err
-			}
-			srcObj.remote = remote
-			return srcObj, nil
 		}
+		if srcObj.parentId == dstParentFile.Id {
+			// need to rename
+			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1]})
+			if result.Error != nil {
+				return nil, errors.Wrap(result.Error, "db rename error")
+			}
+		} else {
+			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: &dstParentFile.Id})
+			if result.Error != nil {
+				return nil, errors.Wrap(result.Error, "db real move error")
+			}
+		}
+		var finalFile FileInfo
+		result := f.db.Where("id = ?", srcObj.id).First(&finalFile)
+		if result.Error != nil {
+			return nil, errors.Wrap(result.Error, "db find final file error")
+		}
+		return NewObjectFromFileInfo(&finalFile, remote, f), nil
 	} else {
 		fs.Debugf(src, "Can't move - not same remote type")
 		return nil, fs.ErrorCantMove
@@ -524,40 +578,67 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string) error {
 	srcFs, ok := src.(*Fs)
 	if ok {
-		//need to sure same account
-		if srcFs.UserId == 0 || f.UserId == 0 || srcFs.UserId != f.UserId {
-			fs.Debugf(f, "Can't move files between drives (%q != %q)", srcFs.UserId, f.UserId)
-			return fs.ErrorCantDirMove
+		//need to sure same db
+		if srcFs.dbId != f.dbId {
+			fs.Debugf(f, "Can't move dir between drives (%q != %q)", srcFs.dbId, srcFs.dbId)
+			return fs.ErrorCantMove
 		}
-		srcAbsolutePath := srcFs.ToAbsolutePath(srcRemote)
-		srcParentDir, _ := SplitPath(srcAbsolutePath)
-		dstParentDir, dstDirName := SplitPath(f.ToAbsolutePath(dstRemote))
-		_, _, err := f.GetFileMeta(ctx, f.ToAbsolutePath(dstRemote), true, true)
-		if err != nil && !errors.Is(err, fs.ErrorObjectNotFound) {
+		//now is same db
+		segments := pathToSegments(dstRemote)
+		var dstParentFile FileInfo = FileInfo{
+			Id: f.rootDirId,
+		}
+
+		for _, segment := range segments[:len(segments)-1] {
+			var fileInfo FileInfo
+			tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+				IsDir:    true,
+				Name:     segment,
+				ParentId: &dstParentFile.Id,
+			})
+			if tx.Error != nil {
+				if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+					return errors.Wrapf(tx.Error, "db move error")
+				}
+			} else {
+				if !fileInfo.IsDir {
+					return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s),segment (%s)", dstRemote, segment)
+				}
+			}
+			dstParentFile = fileInfo
+		}
+
+		var dstRemoteFile FileInfo
+		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&dstRemoteFile)
+		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return errors.Wrapf(tx.Error, "db move error")
+		}
+		if tx.Error == nil {
+			if dstRemoteFile.IsDir {
+				return fs.ErrorDirExists
+			} else {
+				return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s)", dstRemote)
+			}
+		}
+
+		srcRemoteFile, err := srcFs.findRootRelativePathFile(srcRemote)
+		if err != nil {
 			return err
 		}
-		//如果目标路径不存在文件或者文件夹，才能进行重命名和移动文件夹
-		if err == nil {
-			fs.Debugf(f.ToAbsolutePath(dstRemote), "Can't move directory - destination already exists")
-			return fs.ErrorDirExists
+		if !srcRemoteFile.IsDir {
+			return errors.Wrapf(fs.ErrorIsFile, "expected to src be a folder, but is a file. srcRemote (%s)", srcRemote)
 		}
-		if srcParentDir == dstParentDir {
+		if *srcRemoteFile.ParentId == dstParentFile.Id {
 			// need to rename
-			err := f.RenameDirOrFile(ctx, api.FileManagerParam{Path: srcAbsolutePath, NewName: dstDirName})
-			if err != nil {
-				return err
+			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1]})
+			if result.Error != nil {
+				return errors.Wrap(result.Error, "db rename error")
 			}
 		} else {
-			fileManagerParam := api.FileManagerParam{
-				Path:    srcAbsolutePath,
-				Dest:    dstParentDir,
-				NewName: dstDirName,
+			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: &dstParentFile.Id})
+			if result.Error != nil {
+				return errors.Wrap(result.Error, "db real move error")
 			}
-			err := f.MoveOrCopyDirOrFile(ctx, fileManagerParam, api.MoveOperate)
-			if err != nil {
-				return err
-			}
-			return nil
 		}
 		return nil
 	} else {
@@ -575,6 +656,7 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 // Will only be called if src.Fs().Name() == f.Name()
 //
 // If it isn't possible then return fs.ErrorCantCopy
+// remote have file name,if dir copy dir,first list then copy file to remote(file)
 func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
 	srcObj, ok := src.(*Object)
 	if !ok {
@@ -582,22 +664,71 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		return nil, fs.ErrorCantCopy
 	}
 	//need to sure same account
-	if srcObj.fs.UserId == 0 || f.UserId == 0 || srcObj.fs.UserId != f.UserId {
-		fs.Debugf(f, "Can't move files between drives (%q != %q)", srcObj.fs.UserId, srcObj.fs.UserId)
+	if srcObj.fs.dbId != f.dbId {
+		fs.Debugf(f, "Can't move files between drives (%q != %q)", srcObj.fs.dbId, f.dbId)
 		return nil, fs.ErrorCantMove
 	}
-	scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.Remote())
-	//srcParentFile, _ := path.Split(scrAbsolutePath)
-	dstParentFile, dstDirName := SplitPath(f.ToAbsolutePath(remote))
-	fileManagerParam := api.FileManagerParam{
-		Path:    scrAbsolutePath,
-		Dest:    dstParentFile,
-		NewName: dstDirName,
+	//now is same db
+	segments := pathToSegments(remote)
+	var dstParentFile FileInfo = FileInfo{
+		Id: f.rootDirId,
 	}
-	err := f.MoveOrCopyDirOrFile(ctx, fileManagerParam, api.CopyOperate)
+
+	for _, segment := range segments[:len(segments)-1] {
+		var fileInfo FileInfo
+		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+			IsDir:    true,
+			Name:     segment,
+			ParentId: &dstParentFile.Id,
+		})
+		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, errors.Wrapf(tx.Error, "db move error")
+		}
+		if !fileInfo.IsDir {
+			return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
+		}
+		dstParentFile = fileInfo
+	}
+
+	var remoteFile FileInfo
+	tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+	if tx.Error != nil {
+		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, errors.Wrapf(tx.Error, "db move error")
+		}
+	} else {
+		if remoteFile.IsDir {
+			return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
+		} else {
+			//本来就存在那个文件，但是我又要拷贝一个同名文件过去
+			//暂定走覆盖,暂时写成先删除再新增
+			tx = f.db.Delete(&remoteFile)
+			if tx.Error != nil {
+				return nil, errors.Wrapf(tx.Error, "db move remoteFile delete error")
+			}
+		}
+	}
+
+	in, err := srcObj.Open(ctx)
 	if err != nil {
 		return nil, err
 	}
-	srcObj.remote = remote
-	return srcObj, nil
+	content, err := io.ReadAll(in)
+	if err != nil {
+		return nil, err
+	}
+	fileInfo := FileInfo{
+		Name:     segments[len(segments)-1],
+		ParentId: &dstParentFile.Id,
+		FileSize: srcObj.size,
+		IsDir:    false,
+		ModTime:  time.Now(),
+		Content:  content,
+	}
+	result := f.db.Create(fileInfo)
+	if result.Error != nil {
+		return nil, errors.Wrap(result.Error, "db copy error")
+	}
+
+	return NewObjectFromFileInfo(&fileInfo, remote, f), nil
 }
