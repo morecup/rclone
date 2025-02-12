@@ -15,10 +15,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"io"
-	"path"
-	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -410,10 +407,11 @@ func (f *Fs) Purge(ctx context.Context, dir string) error {
 	var retrievedFile FileInfo = FileInfo{
 		Id: f.rootDirId,
 	}
+	tx := f.db.Begin()
 	for _, segment := range segments {
 		var foundFiles []FileInfo
-		tx := f.db.Find(&foundFiles, FileInfo{Name: segment, ParentId: &retrievedFile.Id, IsDir: true})
-		if tx.Error != nil {
+		result := tx.Find(&foundFiles, FileInfo{Name: segment, ParentId: &retrievedFile.Id, IsDir: true})
+		if result.Error != nil {
 			return errors.Wrapf(tx.Error, "db purge error")
 		}
 		if len(foundFiles) == 0 {
@@ -421,15 +419,15 @@ func (f *Fs) Purge(ctx context.Context, dir string) error {
 		}
 		// 删除找到的所有文件
 		for _, file := range foundFiles {
-			tx = f.db.Delete(&file)
-			if tx.Error != nil {
+			result = tx.Delete(&file)
+			if result.Error != nil {
 				return errors.Wrapf(tx.Error, "db delete error")
 			}
 		}
 		retrievedFile = foundFiles[0]
 	}
 
-	return nil
+	return tx.Commit().Error
 }
 
 // Rmdir removes the directory (container, bucket) if empty
@@ -465,6 +463,24 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 			return nil, fs.ErrorCantMove
 		}
 		//now is same db
+		segments := pathToSegments(remote)
+		var retrievedFile FileInfo = FileInfo{
+			Id: f.rootDirId,
+		}
+
+		for _, segment := range segments {
+			var fileInfo FileInfo
+			tx := f.db.Where(FileInfo{ParentId: &retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+				IsDir:    true,
+				Name:     segment,
+				ParentId: &retrievedFile.Id,
+			})
+			if tx.Error != nil {
+				return errors.Wrapf(tx.Error, "db find error")
+			}
+			retrievedFile = fileInfo
+		}
+
 		scrAbsolutePath := srcObj.fs.ToAbsolutePath(srcObj.Remote())
 		srcParentFile, _ := SplitPath(scrAbsolutePath)
 		dstParentFile, dstDirName := SplitPath(f.ToAbsolutePath(remote))
