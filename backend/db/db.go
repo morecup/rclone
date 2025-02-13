@@ -25,9 +25,10 @@ const (
 
 var (
 	rootDir = FileInfo{
-		Id:    dirRootID,
-		Name:  "",
-		IsDir: true,
+		Id:       dirRootID,
+		Name:     "",
+		IsDir:    true,
+		FileSize: -1,
 	}
 )
 
@@ -73,6 +74,7 @@ postgres example: user=postgres password=yourpassword dbname=yourdbname sslmode=
 }
 func Config(ctx context.Context, name string, m configmap.Mapper, config fs.ConfigIn) (*fs.ConfigOut, error) {
 	dbType, _ := m.Get("db_type")
+	//默认存空字符串，但是get的时候会把默认值返回来，比如这里能返回rcloneDB.db
 	dsn, _ := m.Get("data_source_name")
 	var dialector gorm.Dialector
 	if dbType == "sqlite" {
@@ -87,10 +89,6 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	_, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s can not connect", dsn)
-	}
-	value, ok := m.Get("db_id")
-	if !ok || value == "" {
-		m.Set("db_id", dsn)
 	}
 	return nil, nil
 }
@@ -121,7 +119,11 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, err
 	}
 
-	dbId, _ := m.Get("db_id")
+	dsn, _ := m.Get("data_source_name")
+	dbId, ok := m.Get("db_id")
+	if !ok || dbId == "" {
+		dbId = dsn
+	}
 
 	//全局配置信息
 	ci := fs.GetConfig(ctx)
@@ -141,7 +143,6 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}).Fill(ctx, f)
 
 	dbType, _ := m.Get("db_type")
-	dsn, _ := m.Get("data_source_name")
 	var dialector gorm.Dialector
 	if dbType == "sqlite" {
 		dialector = sqlite.Open(dsn)
@@ -168,10 +169,10 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 	for i, segment := range segments {
 		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+		tx := f.db.Where(FileInfo{ParentId: retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 			IsDir:    true,
 			Name:     segment,
-			ParentId: &retrievedFile.Id,
+			ParentId: retrievedFile.Id,
 		})
 		if tx.Error != nil {
 			return nil, errors.Wrapf(tx.Error, "db find error")
@@ -256,7 +257,11 @@ func (f *Fs) findRootRelativePathFile(path string) (*FileInfo, error) {
 	var segments = pathToSegments(path)
 
 	var retrievedFile FileInfo = FileInfo{
-		Id: f.rootDirId,
+		Id:    f.rootDirId,
+		IsDir: true,
+	}
+	if f.rootDirId == dirRootID {
+		retrievedFile = rootDir
 	}
 
 	if len(segments) == 0 && f.rootDirId != dirRootID {
@@ -272,7 +277,7 @@ func (f *Fs) findRootRelativePathFile(path string) (*FileInfo, error) {
 
 	for _, segment := range segments {
 		var foundFile []FileInfo
-		tx := f.db.Find(&foundFile, "name = ? and parentId = ?", segment, retrievedFile.Id)
+		tx := f.db.Find(&foundFile, "name = ? and parent_id = ?", segment, retrievedFile.Id)
 		if tx.Error != nil {
 			return nil, errors.Wrapf(tx.Error, "db find error")
 		}
@@ -297,25 +302,34 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 		return nil, fs.ErrorIsFile
 	}
 	var foundFile []FileInfo
-	tx := f.db.First(&foundFile, "parentId = ?", dirFileInfo.Id)
+	tx := f.db.Find(&foundFile, "parent_id = ?", dirFileInfo.Id)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return entries, nil
 	} else if tx.Error != nil {
 		return nil, errors.Wrapf(tx.Error, "db find error")
 	}
+	if len(foundFile) == 0 {
+		return entries, nil
+	}
 	for _, file := range foundFile {
+		var remote string
+		if dir == "" {
+			remote = file.Name
+		} else {
+			remote = dir + "/" + file.Name
+		}
 		if file.IsDir {
 			entries = append(entries, &Dir{
 				id:       file.Id,
-				parentId: *file.ParentId,
-				remote:   dir + "/" + file.Name,
+				parentId: file.ParentId,
+				remote:   remote,
 				modTime:  file.ModTime,
 				size:     -1,
 				items:    -1,
 				fs:       f,
 			})
 		} else {
-			entries = append(entries, NewObjectFromFileInfo(&file, dir+"/"+file.Name, f))
+			entries = append(entries, NewObjectFromFileInfo(&file, remote, f))
 		}
 	}
 	return entries, nil
@@ -353,10 +367,10 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 
 	for _, segment := range segments[:len(segments)-1] {
 		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &parentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+		tx := f.db.Where(FileInfo{ParentId: parentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 			IsDir:    true,
 			Name:     segment,
-			ParentId: &parentFile.Id,
+			ParentId: parentFile.Id,
 		})
 		if tx.Error != nil {
 			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -372,22 +386,24 @@ func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options .
 
 	var object *Object
 	var remoteFile FileInfo
-	tx := f.db.Where(FileInfo{ParentId: &parentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+	tx := f.db.Where(FileInfo{ParentId: parentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
 	if tx.Error != nil {
 		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrapf(tx.Error, "db move error")
 		} else {
-			result := f.db.Create(&FileInfo{
+			createFileInfo := FileInfo{
 				Name:     segments[len(segments)-1],
 				FileSize: src.Size(),
 				IsDir:    false,
 				ModTime:  src.ModTime(ctx),
 				Content:  nil,
-				ParentId: &parentFile.Id,
-			})
+				ParentId: parentFile.Id,
+			}
+			result := f.db.Create(&createFileInfo)
 			if result.Error != nil {
 				return nil, errors.Wrap(result.Error, "db put error")
 			}
+			object = NewObjectFromFileInfo(&createFileInfo, remote, f)
 		}
 	} else {
 		if remoteFile.IsDir {
@@ -417,10 +433,10 @@ func (f *Fs) Mkdir(ctx context.Context, dir string) error {
 
 	for _, segment := range segments {
 		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+		tx := f.db.Where(FileInfo{ParentId: retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 			IsDir:    true,
 			Name:     segment,
-			ParentId: &retrievedFile.Id,
+			ParentId: retrievedFile.Id,
 		})
 		if tx.Error != nil {
 			return errors.Wrapf(tx.Error, "db find error")
@@ -431,6 +447,32 @@ func (f *Fs) Mkdir(ctx context.Context, dir string) error {
 	return nil
 }
 
+func (f *Fs) Remove(file *FileInfo) error {
+	if file.IsDir {
+		var foundFiles []FileInfo
+		result := f.db.Find(&foundFiles, FileInfo{ParentId: file.Id})
+		if result.Error != nil {
+			return errors.Wrapf(result.Error, "db Remove find error")
+		}
+		for _, foundFile := range foundFiles {
+			err := f.Remove(&foundFile)
+			if err != nil {
+				return err
+			}
+		}
+		result = f.db.Delete(file)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "db Remove dir error")
+		}
+	} else {
+		result := f.db.Delete(file)
+		if result.Error != nil {
+			return errors.Wrap(result.Error, "db Remove file error")
+		}
+	}
+	return nil
+}
+
 // Purge all files in the directory specified
 //
 // Implement this if you have a way of deleting all the files
@@ -438,31 +480,11 @@ func (f *Fs) Mkdir(ctx context.Context, dir string) error {
 //
 // Return an error if it doesn't exist
 func (f *Fs) Purge(ctx context.Context, dir string) error {
-	segments := pathToSegments(dir)
-	var retrievedFile FileInfo = FileInfo{
-		Id: f.rootDirId,
+	file, err := f.findRootRelativePathFile(dir)
+	if err != nil {
+		return err
 	}
-	tx := f.db.Begin()
-	for _, segment := range segments {
-		var foundFiles []FileInfo
-		result := tx.Find(&foundFiles, FileInfo{Name: segment, ParentId: &retrievedFile.Id, IsDir: true})
-		if result.Error != nil {
-			return errors.Wrapf(tx.Error, "db purge error")
-		}
-		if len(foundFiles) == 0 {
-			break
-		}
-		// 删除找到的所有文件
-		for _, file := range foundFiles {
-			result = tx.Delete(&file)
-			if result.Error != nil {
-				return errors.Wrapf(tx.Error, "db delete error")
-			}
-		}
-		retrievedFile = foundFiles[0]
-	}
-
-	return tx.Commit().Error
+	return f.Remove(file)
 }
 
 // Rmdir removes the directory (container, bucket) if empty
@@ -505,10 +527,10 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 
 		for _, segment := range segments[:len(segments)-1] {
 			var fileInfo FileInfo
-			tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+			tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 				IsDir:    true,
 				Name:     segment,
-				ParentId: &dstParentFile.Id,
+				ParentId: dstParentFile.Id,
 			})
 			if tx.Error != nil {
 				if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
@@ -523,7 +545,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		}
 
 		var remoteFile FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+		tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
 		if tx.Error != nil {
 			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 				return nil, errors.Wrapf(tx.Error, "db move error")
@@ -548,7 +570,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 				return nil, errors.Wrap(result.Error, "db rename error")
 			}
 		} else {
-			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: &dstParentFile.Id})
+			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: dstParentFile.Id})
 			if result.Error != nil {
 				return nil, errors.Wrap(result.Error, "db real move error")
 			}
@@ -589,35 +611,44 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 			Id: f.rootDirId,
 		}
 
-		for _, segment := range segments[:len(segments)-1] {
-			var fileInfo FileInfo
-			tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-				IsDir:    true,
-				Name:     segment,
-				ParentId: &dstParentFile.Id,
-			})
-			if tx.Error != nil {
-				if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-					return errors.Wrapf(tx.Error, "db move error")
-				}
-			} else {
-				if !fileInfo.IsDir {
-					return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s),segment (%s)", dstRemote, segment)
-				}
-			}
-			dstParentFile = fileInfo
+		var dstFileName string
+		if len(segments) == 0 {
+			//todo
+		} else {
+			dstFileName = segments[len(segments)-1]
 		}
 
-		var dstRemoteFile FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&dstRemoteFile)
-		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return errors.Wrapf(tx.Error, "db move error")
-		}
-		if tx.Error == nil {
-			if dstRemoteFile.IsDir {
-				return fs.ErrorDirExists
+		for i, segment := range segments {
+			if i != len(segments)-1 {
+				var fileInfo FileInfo
+				tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+					IsDir:    true,
+					Name:     segment,
+					ParentId: dstParentFile.Id,
+				})
+				if tx.Error != nil {
+					if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+						return errors.Wrapf(tx.Error, "db move error")
+					}
+				} else {
+					if !fileInfo.IsDir {
+						return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s),segment (%s)", dstRemote, segment)
+					}
+				}
+				dstParentFile = fileInfo
 			} else {
-				return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s)", dstRemote)
+				var dstRemoteFile FileInfo
+				tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&dstRemoteFile)
+				if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+					return errors.Wrapf(tx.Error, "db move error")
+				}
+				if tx.Error == nil {
+					if dstRemoteFile.IsDir {
+						return fs.ErrorDirExists
+					} else {
+						return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s)", dstRemote)
+					}
+				}
 			}
 		}
 
@@ -628,14 +659,14 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 		if !srcRemoteFile.IsDir {
 			return errors.Wrapf(fs.ErrorIsFile, "expected to src be a folder, but is a file. srcRemote (%s)", srcRemote)
 		}
-		if *srcRemoteFile.ParentId == dstParentFile.Id {
+		if srcRemoteFile.ParentId == dstParentFile.Id {
 			// need to rename
-			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1]})
+			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName})
 			if result.Error != nil {
 				return errors.Wrap(result.Error, "db rename error")
 			}
 		} else {
-			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: &dstParentFile.Id})
+			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName, ParentId: dstParentFile.Id})
 			if result.Error != nil {
 				return errors.Wrap(result.Error, "db real move error")
 			}
@@ -676,10 +707,10 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 
 	for _, segment := range segments[:len(segments)-1] {
 		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
+		tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
 			IsDir:    true,
 			Name:     segment,
-			ParentId: &dstParentFile.Id,
+			ParentId: dstParentFile.Id,
 		})
 		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrapf(tx.Error, "db move error")
@@ -691,7 +722,7 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}
 
 	var remoteFile FileInfo
-	tx := f.db.Where(FileInfo{ParentId: &dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+	tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
 	if tx.Error != nil {
 		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrapf(tx.Error, "db move error")
@@ -719,7 +750,7 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}
 	fileInfo := FileInfo{
 		Name:     segments[len(segments)-1],
-		ParentId: &dstParentFile.Id,
+		ParentId: dstParentFile.Id,
 		FileSize: srcObj.size,
 		IsDir:    false,
 		ModTime:  time.Now(),

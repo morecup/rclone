@@ -13,7 +13,7 @@ type FileInfo struct {
 	IsDir    bool
 	ModTime  time.Time
 	Content  []byte
-	ParentId *string
+	ParentId string
 }
 
 func (fi *FileInfo) BeforeCreate(tx *gorm.DB) (err error) {

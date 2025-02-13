@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="chunker move" type="GoApplicationRunConfiguration" factoryName="Go Application">
+  <configuration default="false" name="chunker move file" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="rclone" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="move --verbose --transfers 4 --checkers 8 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list baiduchunk:test/BOOT baiduchunk:test/23133/ -vv" />
+    <parameters value="move --verbose --transfers 4 --checkers 8 --contimeout 60s --timeout 300s --retries 3 --low-level-retries 10 --stats 1s --stats-file-name-length 0 --fast-list baiduchunk:test/30MB.txt baiduchunk:test/testmove -vv" />
     <kind value="PACKAGE" />
     <package value="github.com/rclone/rclone" />
     <directory value="$PROJECT_DIR$" />

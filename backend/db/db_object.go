@@ -28,7 +28,7 @@ type Object struct {
 func NewObjectFromFileInfo(file *FileInfo, absolutePath string, f *Fs) *Object {
 	return &Object{
 		id:       file.Id,
-		parentId: *file.ParentId,
+		parentId: file.ParentId,
 		remote:   absolutePath,
 		modTime:  file.ModTime,
 		size:     file.FileSize,
@@ -108,7 +108,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 				}
 			}
 		}
-		reader := bytes.NewReader(fileInfo.Content[rangeStart:rangeEnd])
+		reader := bytes.NewReader(fileInfo.Content[rangeStart : rangeEnd+1])
 		return io.NopCloser(reader), nil
 	}
 }
@@ -121,7 +121,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	if err != nil {
 		return err
 	}
-	//如何文件本身就没有，会去创建，如果中间的文件夹不存在，也会自动创建
+	//如何文件本身就没有，会去创建，如果中间的文件夹不存在，也会自动创建?
 	fileInfo := FileInfo{
 		Id:       o.id,
 		Name:     o.fileName,
@@ -129,12 +129,19 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		Content:  allByte,
 		ModTime:  src.ModTime(ctx),
 		IsDir:    false,
-		ParentId: &o.parentId,
+		ParentId: o.parentId,
 	}
 	result := o.fs.db.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
 	if result.Error != nil {
 		return errors.Wrapf(result.Error, "Error update object %s", o)
 	}
+	//更新o对象信息
+	o.id = fileInfo.Id
+	o.modTime = fileInfo.ModTime
+	o.size = fileInfo.FileSize
+	o.fileName = fileInfo.Name
+	o.parentId = fileInfo.ParentId
+	o.remote = src.Remote()
 	return err
 }
 
