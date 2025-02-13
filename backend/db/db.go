@@ -8,12 +8,15 @@ import (
 	"github.com/rclone/rclone/fs/config/configmap"
 	"github.com/rclone/rclone/fs/config/configstruct"
 	"github.com/rclone/rclone/fs/hash"
+	"github.com/rclone/rclone/lib/dircache"
 	"github.com/rclone/rclone/lib/encoder"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"io"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -108,6 +111,7 @@ type Fs struct {
 	db        *gorm.DB
 	rootDirId string
 	dbId      string
+	dirCache  *dircache.DirCache
 }
 
 // NewFs root is linux path ,maybe "" "/" "/1/2" is not be "\1" "\\1" .root may be file path. need to fix
@@ -118,6 +122,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	if err != nil {
 		return nil, err
 	}
+	root = strings.Trim(root, "/")
 
 	dsn, _ := m.Get("data_source_name")
 	dbId, ok := m.Get("db_id")
@@ -157,42 +162,79 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s can not connect", dsn)
 	}
+	db.Config.Logger = logger.Default.LogMode(logger.Error)
 	f.db = db
 	err = db.AutoMigrate(&FileInfo{})
 	if err != nil {
 		return nil, err
 	}
 
-	var segments []string = pathToSegments(root)
+	f.dirCache = dircache.New(root, rootDir.Id, f)
+
+	err = f.dirCache.FindRoot(ctx, false)
+	if err != nil {
+		// Assume it is a file
+		newRoot, _ := dircache.SplitPath(root)
+		tempF := *f
+		tempF.dirCache = dircache.New(newRoot, rootDir.Id, &tempF)
+		tempF.root = newRoot
+		// Make new Fs which is the parent
+		err = tempF.dirCache.FindRoot(ctx, false)
+		if err != nil {
+			// No root so return old f
+			return f, nil
+		}
+		_, err := tempF.readMetaDataForPath(ctx, root)
+		if err != nil {
+			if errors.Is(err, fs.ErrorDirNotFound) || errors.Is(err, fs.ErrorObjectOrDirNotFound) {
+				// File doesn't exist so return old f
+				return f, nil
+			}
+			return nil, err
+		}
+		// XXX: update the old f here instead of returning tempF, since
+		// `features` were already filled with functions having *f as a receiver.
+		// See https://github.com/rclone/rclone/issues/2182
+		f.dirCache = tempF.dirCache
+		f.root = tempF.root
+		// return an error with an fs which points to the parent
+		return f, fs.ErrorIsFile
+	}
+	return f, nil
+}
+
+// Return an FileInfo from a path
+// If it can't be found it returns the error fs.ErrorObjectNotFound.
+func (f *Fs) readMetaDataForPath(ctx context.Context, path string) (*FileInfo, error) {
+	// 处理特殊情况，移除结果中的空字符串
+	var segments = pathToSegments(path)
 
 	var retrievedFile FileInfo = rootDir
 
 	for i, segment := range segments {
-		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-			IsDir:    true,
-			Name:     segment,
-			ParentId: retrievedFile.Id,
-		})
-		if tx.Error != nil {
-			return nil, errors.Wrapf(tx.Error, "db find error")
-		}
-		if i == len(segments)-1 {
-			if !fileInfo.IsDir {
-				//if root is file path,fix root to dir path
-				break
-			}
+		var foundFile []FileInfo
+		var tx *gorm.DB
+		if i != len(segments)-1 {
+			tx = f.db.Find(&foundFile, "name = ? and parent_id = ? and is_dir = 1", segment, retrievedFile.Id)
 		} else {
-			if !fileInfo.IsDir {
-				return nil, errors.Errorf("expected to be a folder, but is a file. root (%s),segment (%s)", root, segment)
+			tx = f.db.Find(&foundFile, "name = ? and parent_id = ?", segment, retrievedFile.Id)
+		}
+		if tx.Error != nil {
+			return nil, errors.Wrapf(tx.Error, "db readMetaDataForPath error.path (%s),segment (%s)", path, segment)
+		}
+		if len(foundFile) == 0 {
+			if i != len(segments)-1 {
+				return nil, errors.Wrapf(fs.ErrorDirNotFound, "can not found this segment in db. path (%s),segment (%s)", path, segment)
+			} else {
+				return nil, errors.Wrapf(fs.ErrorObjectOrDirNotFound, "can not found this segment in db. path (%s),segment (%s)", path, segment)
 			}
 		}
-		retrievedFile = fileInfo
+		if len(foundFile) > 1 {
+			return nil, errors.Errorf("found %d same name file in db. path (%s),segment (%s)", len(foundFile), path, segment)
+		}
+		retrievedFile = foundFile[0]
 	}
-
-	f.rootDirId = retrievedFile.Id
-
-	return f, nil
+	return &retrievedFile, nil
 }
 
 // Name of the remote (as passed into NewFs)
@@ -227,13 +269,46 @@ func (f *Fs) Precision() time.Duration {
 }
 
 func (f *Fs) FindLeaf(ctx context.Context, pathID, leaf string) (pathIDOut string, found bool, err error) {
-	//TODO implement me
-	panic("implement me")
+	// fs.Debugf(f, "FindLeaf(%q, %q)", pathID, leaf)
+	_, ok := f.dirCache.GetInv(pathID)
+	if !ok {
+		return "", false, errors.New("couldn't find parent ID")
+	}
+	var foundFile []FileInfo
+	tx := f.db.Find(&foundFile, "name = ? and parent_id = ?", leaf, pathID)
+	if tx.Error != nil {
+		return "", false, errors.Wrapf(tx.Error, "FindLeaf:db find error")
+	}
+	if len(foundFile) == 0 {
+		return "", false, nil
+	} else if len(foundFile) == 1 {
+		if foundFile[0].IsDir {
+			return foundFile[0].Id, true, nil
+		} else {
+			return "", false, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. pathID (%s) leaf (%s) ", pathID, leaf)
+		}
+	} else {
+		return "", false, errors.Errorf("found %d files in db. pathID (%s),leaf (%s)", len(foundFile), pathID, leaf)
+	}
 }
 
 func (f *Fs) CreateDir(ctx context.Context, pathID, leaf string) (newID string, err error) {
-	//TODO implement me
-	panic("implement me")
+	// fs.Debugf(f, "CreateDir(%q, %q)\n", dirID, leaf)
+	var fileInfo FileInfo
+	tx := f.db.Where(FileInfo{ParentId: pathID, Name: leaf}).FirstOrCreate(&fileInfo, FileInfo{
+		IsDir:    true,
+		Name:     leaf,
+		ParentId: pathID,
+		ModTime:  time.Now(),
+		FileSize: -1,
+	})
+	if tx.Error != nil {
+		return "", errors.Wrapf(tx.Error, "CreateDir:db find error")
+	}
+	if !fileInfo.IsDir {
+		return "", errors.Wrapf(fs.ErrorIsDir, "CreateDir: expected to be a file, but is a folder. pathID (%s) leaf (%s) ", pathID, leaf)
+	}
+	return fileInfo.Id, nil
 }
 
 func pathToSegments(path string) []string {
@@ -294,15 +369,13 @@ func (f *Fs) findRootRelativePathFile(path string) (*FileInfo, error) {
 
 // List entries normal need to implement fs.Directory or fs.Object ,dir is relative path,f.root is base path
 func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err error) {
-	dirFileInfo, err := f.findRootRelativePathFile(dir)
+	directoryID, err := f.dirCache.FindDir(ctx, dir, false)
 	if err != nil {
 		return nil, err
 	}
-	if !dirFileInfo.IsDir {
-		return nil, fs.ErrorIsFile
-	}
+
 	var foundFile []FileInfo
-	tx := f.db.Find(&foundFile, "parent_id = ?", dirFileInfo.Id)
+	tx := f.db.Find(&foundFile, "parent_id = ?", directoryID)
 	if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 		return entries, nil
 	} else if tx.Error != nil {
@@ -338,15 +411,26 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 // NewObject finds the Object at remote.  If it can't be found
 // it returns the error fs.ErrorObjectNotFound.
 func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
-	fileInfo, err := f.findRootRelativePathFile(remote)
+	fileName, parentDirId, err := f.dirCache.FindPath(ctx, remote, false)
 	if err != nil {
-		fs.Error(f, err.Error())
 		return nil, fs.ErrorObjectNotFound
 	}
-	if fileInfo.IsDir {
-		return nil, fs.ErrorIsDir
+
+	var remoteFile FileInfo
+	tx := f.db.Where(FileInfo{ParentId: parentDirId, Name: fileName}).First(&remoteFile)
+	if tx.Error != nil {
+		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, errors.Wrapf(tx.Error, "db move error")
+		} else {
+			return nil, fs.ErrorObjectNotFound
+		}
+	} else {
+		if remoteFile.IsDir {
+			return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
+		} else {
+			return NewObjectFromFileInfo(&remoteFile, remote, f), nil
+		}
 	}
-	return NewObjectFromFileInfo(fileInfo, remote, f), nil
 }
 
 // Put in to the remote path with the modTime given of the given size
@@ -360,61 +444,21 @@ func (f *Fs) NewObject(ctx context.Context, remote string) (fs.Object, error) {
 // nil and the error
 func (f *Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
 	remote := src.Remote()
-	segments := pathToSegments(remote)
-	var parentFile FileInfo = FileInfo{
-		Id: f.rootDirId,
+	// Create the directory for the object if it doesn't exist
+	leaf, directoryID, err := f.dirCache.FindPath(ctx, remote, true)
+	if err != nil {
+		return nil, err
+	}
+	o := &Object{
+		fs:       f,
+		remote:   src.Remote(),
+		size:     src.Size(),
+		modTime:  src.ModTime(ctx),
+		parentId: directoryID,
+		fileName: leaf,
 	}
 
-	for _, segment := range segments[:len(segments)-1] {
-		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: parentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-			IsDir:    true,
-			Name:     segment,
-			ParentId: parentFile.Id,
-		})
-		if tx.Error != nil {
-			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-				return nil, errors.Wrapf(tx.Error, "db move error")
-			}
-		} else {
-			if !fileInfo.IsDir {
-				return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
-			}
-		}
-		parentFile = fileInfo
-	}
-
-	var object *Object
-	var remoteFile FileInfo
-	tx := f.db.Where(FileInfo{ParentId: parentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
-	if tx.Error != nil {
-		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, errors.Wrapf(tx.Error, "db move error")
-		} else {
-			createFileInfo := FileInfo{
-				Name:     segments[len(segments)-1],
-				FileSize: src.Size(),
-				IsDir:    false,
-				ModTime:  src.ModTime(ctx),
-				Content:  nil,
-				ParentId: parentFile.Id,
-			}
-			result := f.db.Create(&createFileInfo)
-			if result.Error != nil {
-				return nil, errors.Wrap(result.Error, "db put error")
-			}
-			object = NewObjectFromFileInfo(&createFileInfo, remote, f)
-		}
-	} else {
-		if remoteFile.IsDir {
-			return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
-		} else {
-			object = NewObjectFromFileInfo(&remoteFile, remote, f)
-		}
-	}
-	err := object.Update(ctx, in, src, options...)
-
-	return object, err
+	return o, o.Update(ctx, in, src, options...)
 }
 
 // PutStream uploads to the remote path with the modTime given of indeterminate size
@@ -426,46 +470,29 @@ func (f *Fs) PutStream(ctx context.Context, in io.Reader, src fs.ObjectInfo, opt
 //
 // Shouldn't return an error if it already exists
 func (f *Fs) Mkdir(ctx context.Context, dir string) error {
-	segments := pathToSegments(dir)
-	var retrievedFile FileInfo = FileInfo{
-		Id: f.rootDirId,
-	}
-
-	for _, segment := range segments {
-		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: retrievedFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-			IsDir:    true,
-			Name:     segment,
-			ParentId: retrievedFile.Id,
-		})
-		if tx.Error != nil {
-			return errors.Wrapf(tx.Error, "db find error")
-		}
-		retrievedFile = fileInfo
-	}
-
-	return nil
+	_, err := f.dirCache.FindDir(ctx, dir, true)
+	return err
 }
 
-func (f *Fs) Remove(file *FileInfo) error {
-	if file.IsDir {
+func (f *Fs) Remove(fileId string, isDir bool) error {
+	if isDir {
 		var foundFiles []FileInfo
-		result := f.db.Find(&foundFiles, FileInfo{ParentId: file.Id})
+		result := f.db.Find(&foundFiles, FileInfo{ParentId: fileId})
 		if result.Error != nil {
 			return errors.Wrapf(result.Error, "db Remove find error")
 		}
 		for _, foundFile := range foundFiles {
-			err := f.Remove(&foundFile)
+			err := f.Remove(foundFile.Id, foundFile.IsDir)
 			if err != nil {
 				return err
 			}
 		}
-		result = f.db.Delete(file)
+		result = f.db.Delete(FileInfo{Id: fileId})
 		if result.Error != nil {
 			return errors.Wrap(result.Error, "db Remove dir error")
 		}
 	} else {
-		result := f.db.Delete(file)
+		result := f.db.Delete(FileInfo{Id: fileId})
 		if result.Error != nil {
 			return errors.Wrap(result.Error, "db Remove file error")
 		}
@@ -480,17 +507,27 @@ func (f *Fs) Remove(file *FileInfo) error {
 //
 // Return an error if it doesn't exist
 func (f *Fs) Purge(ctx context.Context, dir string) error {
-	file, err := f.findRootRelativePathFile(dir)
+	rootID, err := f.dirCache.FindDir(ctx, dir, false)
 	if err != nil {
 		return err
 	}
-	return f.Remove(file)
+	err = f.Remove(rootID, true)
+	if err != nil {
+		return err
+	}
+	f.dirCache.FlushDir(dir)
+	return nil
 }
 
 // Rmdir removes the directory (container, bucket) if empty
 //
 // Return an error if it doesn't exist or isn't empty
 func (f *Fs) Rmdir(ctx context.Context, dir string) error {
+	root := path.Join(f.root, dir)
+	if root == "" {
+		return errors.New("can't purge root directory")
+	}
+
 	entries, err := f.List(ctx, dir)
 	if err != nil {
 		return err
@@ -520,32 +557,13 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 			return nil, fs.ErrorCantMove
 		}
 		//now is same db
-		segments := pathToSegments(remote)
-		var dstParentFile FileInfo = FileInfo{
-			Id: f.rootDirId,
-		}
-
-		for _, segment := range segments[:len(segments)-1] {
-			var fileInfo FileInfo
-			tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-				IsDir:    true,
-				Name:     segment,
-				ParentId: dstParentFile.Id,
-			})
-			if tx.Error != nil {
-				if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-					return nil, errors.Wrapf(tx.Error, "db move error")
-				}
-			} else {
-				if !fileInfo.IsDir {
-					return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
-				}
-			}
-			dstParentFile = fileInfo
+		dstFileName, dstParentDirID, err := f.dirCache.FindPath(ctx, remote, true)
+		if err != nil {
+			return nil, err
 		}
 
 		var remoteFile FileInfo
-		tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+		tx := f.db.Where(FileInfo{ParentId: dstParentDirID, Name: dstFileName}).First(&remoteFile)
 		if tx.Error != nil {
 			if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 				return nil, errors.Wrapf(tx.Error, "db move error")
@@ -555,7 +573,7 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 				return nil, errors.Wrapf(fs.ErrorIsDir, "expected to be a file, but is a folder. remote (%s)", remote)
 			} else {
 				//排除重命名操作时，两个路径相同的情况
-				if segments[len(segments)-1] != srcObj.fileName {
+				if dstFileName != srcObj.fileName {
 					tx = f.db.Delete(&remoteFile)
 					if tx.Error != nil {
 						return nil, errors.Wrapf(tx.Error, "db move remoteFile delete error")
@@ -563,14 +581,14 @@ func (f *Fs) Move(ctx context.Context, src fs.Object, remote string) (fs.Object,
 				}
 			}
 		}
-		if srcObj.parentId == dstParentFile.Id {
+		if srcObj.parentId == dstParentDirID {
 			// need to rename
-			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1]})
+			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName})
 			if result.Error != nil {
 				return nil, errors.Wrap(result.Error, "db rename error")
 			}
 		} else {
-			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: segments[len(segments)-1], ParentId: dstParentFile.Id})
+			result := f.db.Where("id = ?", srcObj.id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName, ParentId: dstParentDirID})
 			if result.Error != nil {
 				return nil, errors.Wrap(result.Error, "db real move error")
 			}
@@ -605,71 +623,36 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 			fs.Debugf(f, "Can't move dir between drives (%q != %q)", srcFs.dbId, srcFs.dbId)
 			return fs.ErrorCantMove
 		}
-		//now is same db
-		segments := pathToSegments(dstRemote)
-		var dstParentFile FileInfo = FileInfo{
-			Id: f.rootDirId,
-		}
-
-		var dstFileName string
-		if len(segments) == 0 {
-			//todo
-		} else {
-			dstFileName = segments[len(segments)-1]
-		}
-
-		for i, segment := range segments {
-			if i != len(segments)-1 {
-				var fileInfo FileInfo
-				tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-					IsDir:    true,
-					Name:     segment,
-					ParentId: dstParentFile.Id,
-				})
-				if tx.Error != nil {
-					if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-						return errors.Wrapf(tx.Error, "db move error")
-					}
-				} else {
-					if !fileInfo.IsDir {
-						return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s),segment (%s)", dstRemote, segment)
-					}
-				}
-				dstParentFile = fileInfo
-			} else {
-				var dstRemoteFile FileInfo
-				tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&dstRemoteFile)
-				if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-					return errors.Wrapf(tx.Error, "db move error")
-				}
-				if tx.Error == nil {
-					if dstRemoteFile.IsDir {
-						return fs.ErrorDirExists
-					} else {
-						return errors.Wrapf(fs.ErrorIsFile, "expected to dst be a folder, but is a file. dstRemote (%s)", dstRemote)
-					}
-				}
-			}
-		}
-
-		srcRemoteFile, err := srcFs.findRootRelativePathFile(srcRemote)
+		_, srcParentDirId, err := srcFs.dirCache.FindPath(ctx, srcRemote, false)
 		if err != nil {
 			return err
 		}
-		if !srcRemoteFile.IsDir {
-			return errors.Wrapf(fs.ErrorIsFile, "expected to src be a folder, but is a file. srcRemote (%s)", srcRemote)
+		dstDirName, dstParentDirId, err := f.dirCache.FindPath(ctx, dstRemote, true)
+		if err != nil {
+			return err
 		}
-		if srcRemoteFile.ParentId == dstParentFile.Id {
+		srcDirId, err := srcFs.dirCache.FindDir(ctx, srcRemote, false)
+		if err != nil {
+			return fs.ErrorDirNotFound
+		}
+		_, err = f.dirCache.FindDir(ctx, dstRemote, false)
+		if err == nil {
+			return fs.ErrorDirExists
+		}
+
+		if srcParentDirId == dstParentDirId {
 			// need to rename
-			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName})
+			result := f.db.Where("id = ?", srcDirId).Updates(FileInfo{ModTime: time.Now(), Name: dstDirName})
 			if result.Error != nil {
 				return errors.Wrap(result.Error, "db rename error")
 			}
+			srcFs.dirCache.FlushDir(srcRemote)
 		} else {
-			result := f.db.Where("id = ?", srcRemoteFile.Id).Updates(FileInfo{ModTime: time.Now(), Name: dstFileName, ParentId: dstParentFile.Id})
+			result := f.db.Where("id = ?", srcDirId).Updates(FileInfo{ModTime: time.Now(), Name: dstDirName, ParentId: dstParentDirId})
 			if result.Error != nil {
 				return errors.Wrap(result.Error, "db real move error")
 			}
+			srcFs.dirCache.FlushDir(srcRemote)
 		}
 		return nil
 	} else {
@@ -696,33 +679,17 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}
 	//need to sure same account
 	if srcObj.fs.dbId != f.dbId {
-		fs.Debugf(f, "Can't move files between drives (%q != %q)", srcObj.fs.dbId, f.dbId)
+		fs.Debugf(f, "Can't move files between dbId (%q != %q)", srcObj.fs.dbId, f.dbId)
 		return nil, fs.ErrorCantMove
 	}
 	//now is same db
-	segments := pathToSegments(remote)
-	var dstParentFile FileInfo = FileInfo{
-		Id: f.rootDirId,
-	}
-
-	for _, segment := range segments[:len(segments)-1] {
-		var fileInfo FileInfo
-		tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segment}).FirstOrCreate(&fileInfo, FileInfo{
-			IsDir:    true,
-			Name:     segment,
-			ParentId: dstParentFile.Id,
-		})
-		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
-			return nil, errors.Wrapf(tx.Error, "db move error")
-		}
-		if !fileInfo.IsDir {
-			return nil, errors.Wrapf(fs.ErrorIsFile, "expected to be a folder, but is a file. remote (%s),segment (%s)", remote, segment)
-		}
-		dstParentFile = fileInfo
+	dstFileName, dstParentDirID, err := f.dirCache.FindPath(ctx, remote, true)
+	if err != nil {
+		return nil, err
 	}
 
 	var remoteFile FileInfo
-	tx := f.db.Where(FileInfo{ParentId: dstParentFile.Id, Name: segments[len(segments)-1]}).First(&remoteFile)
+	tx := f.db.Where(FileInfo{ParentId: dstParentDirID, Name: dstFileName}).First(&remoteFile)
 	if tx.Error != nil {
 		if !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrapf(tx.Error, "db move error")
@@ -749,17 +716,23 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		return nil, err
 	}
 	fileInfo := FileInfo{
-		Name:     segments[len(segments)-1],
-		ParentId: dstParentFile.Id,
+		Name:     dstFileName,
+		ParentId: dstParentDirID,
 		FileSize: srcObj.size,
 		IsDir:    false,
 		ModTime:  time.Now(),
 		Content:  content,
 	}
-	result := f.db.Create(fileInfo)
+	result := f.db.Create(&fileInfo)
 	if result.Error != nil {
 		return nil, errors.Wrap(result.Error, "db copy error")
 	}
 
 	return NewObjectFromFileInfo(&fileInfo, remote, f), nil
+}
+
+// DirCacheFlush resets the directory cache - used in testing as an
+// optional interface
+func (f *Fs) DirCacheFlush() {
+	f.dirCache.ResetRoot()
 }

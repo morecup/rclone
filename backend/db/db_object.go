@@ -121,7 +121,8 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	if err != nil {
 		return err
 	}
-	//如何文件本身就没有，会去创建，如果中间的文件夹不存在，也会自动创建?
+	//如何文件本身就没有，会去创建，如果中间的文件夹不存在，不会自动创建
+	tx := o.fs.db.Begin()
 	fileInfo := FileInfo{
 		Id:       o.id,
 		Name:     o.fileName,
@@ -131,10 +132,20 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		IsDir:    false,
 		ParentId: o.parentId,
 	}
-	result := o.fs.db.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
-	if result.Error != nil {
-		return errors.Wrapf(result.Error, "Error update object %s", o)
+	if o.id == "" {
+		result := tx.Create(&fileInfo)
+		if result.Error != nil {
+			tx.Rollback()
+			return errors.Wrapf(result.Error, "Error update object %s", o)
+		}
+	} else {
+		result := tx.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
+		if result.Error != nil {
+			tx.Rollback()
+			return errors.Wrapf(result.Error, "Error update object %s", o)
+		}
 	}
+
 	//更新o对象信息
 	o.id = fileInfo.Id
 	o.modTime = fileInfo.ModTime
@@ -142,6 +153,8 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	o.fileName = fileInfo.Name
 	o.parentId = fileInfo.ParentId
 	o.remote = src.Remote()
+
+	tx.Commit()
 	return err
 }
 
