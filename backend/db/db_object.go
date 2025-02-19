@@ -6,8 +6,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/hash"
+	"github.com/rclone/rclone/lib/paths"
 	"gorm.io/gorm"
 	"io"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -16,7 +21,7 @@ import (
 // Will definitely have info but maybe not meta
 type Object struct {
 	fs       *Fs       // what this object is part of
-	remote   string    // The remote path  absolute path,no object name
+	remote   string    // The remote path  base root relativePath path,have file name
 	size     int64     // size of the object
 	modTime  time.Time // modification time of the object
 	id       string    // ID of the object
@@ -26,14 +31,26 @@ type Object struct {
 
 // ------------------------------------------------------------
 func NewObjectFromFileInfo(file *FileInfo, absolutePath string, f *Fs) *Object {
-	return &Object{
-		id:       file.Id,
-		parentId: file.ParentId,
-		remote:   absolutePath,
-		modTime:  file.ModTime,
-		size:     file.FileSize,
-		fs:       f,
-		fileName: file.Name,
+	if file.IsLink && f.opt.IsLinkFileMode {
+		return &Object{
+			id:       file.Id,
+			parentId: file.ParentId,
+			remote:   absolutePath + linkSuffix,
+			modTime:  file.ModTime,
+			size:     file.FileSize,
+			fs:       f,
+			fileName: file.Name + linkSuffix,
+		}
+	} else {
+		return &Object{
+			id:       file.Id,
+			parentId: file.ParentId,
+			remote:   absolutePath,
+			modTime:  file.ModTime,
+			size:     file.FileSize,
+			fs:       f,
+			fileName: file.Name,
+		}
 	}
 }
 
@@ -85,6 +102,8 @@ func (o *Object) Storable() bool {
 }
 
 func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
+	//如果打开的软链接文件，需要特殊处理
+
 	fs.FixRangeOption(options, o.size)
 	var fileInfo FileInfo
 	result := o.fs.db.Select("content", "is_dir").First(&fileInfo, "id = ?", o.id)
@@ -113,16 +132,67 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 	}
 }
 
+// ResolveDerivedPathFromRelative 根据aPath->bPath的相对路径推倒cPath->dPath的相对路径，返回dPath
+func ResolveDerivedPathFromRelative(aPath, bPath, cPath string, isDirResolve bool) (string, error) {
+	// 处理 A 路径：去除前缀并转换为linux格式
+	aLinuxPath := convertWindowsPathToLinuxStyle(aPath)
+	bLinuxPath := convertWindowsPathToLinuxStyle(bPath)
+
+	if !isDirResolve {
+		aLinuxPath = path.Dir(aLinuxPath)
+	}
+
+	// 计算 A 目录到 B 文件的相对路径（需统一为 Unix 分隔符以适配 C 路径）
+	var relative string
+
+	relative, err := filepath.Rel(aLinuxPath, bLinuxPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	linuxRelative := filepath.ToSlash(relative)
+
+	// 处理 C 路径：提取目录并应用相对路径
+	if !isDirResolve {
+		cPath = path.Dir(cPath)
+	}
+	dPath, err := paths.Join(cPath, linuxRelative)
+
+	return dPath, err
+}
+func convertWindowsPathToLinuxStyle(windowsPath string) string {
+	// 去除特殊的长路径前缀
+	windowsPath = strings.TrimPrefix(windowsPath, `\\?\`)
+	windowsPath = strings.TrimPrefix(windowsPath, `//?/`)
+	windowsPath = strings.TrimPrefix(windowsPath, `/?/`)
+
+	// 替换所有反斜杠为正斜杠
+	linuxStylePath := strings.ReplaceAll(windowsPath, `\`, `/`)
+
+	// 将驱动器标记D:替换为/D
+	linuxStylePath = strings.Replace(linuxStylePath, `:`, ``, 1)
+
+	// 可选：为驱动器添加前导斜杠
+	if len(linuxStylePath) > 0 && linuxStylePath[1] == '/' {
+		linuxStylePath = "/" + linuxStylePath
+	}
+
+	return linuxStylePath
+}
+
 // Update the object with the contents of the io.Reader, modTime and size
 //
 // The new object may have been created if an error is returned 可能本身这个object就不存在？？
 func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
+	//如果是更新软链接文件内容，则需要更新链接到的文件的内容
+
 	allByte, err := io.ReadAll(in)
 	if err != nil {
 		return err
 	}
 	//如何文件本身就没有，会去创建，如果中间的文件夹不存在，不会自动创建
-	tx := o.fs.db.Begin()
+
 	fileInfo := FileInfo{
 		Id:       o.id,
 		Name:     o.fileName,
@@ -132,6 +202,37 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		IsDir:    false,
 		ParentId: o.parentId,
 	}
+	isLinkModeFile := strings.HasSuffix(src.Remote(), linkSuffix)
+	if isLinkModeFile {
+		fileInfo.IsLink = true
+		fileInfo.Name = strings.TrimSuffix(o.fileName, linkSuffix)
+		//localObject := src.(*local.Object)
+		////	判断是文件夹软链还是文件软链
+		//linkdst, err := os.Readlink(localObject.path)
+		//if err != nil {
+		//	return nil, err
+		//}
+
+		linkToPath := string(allByte)
+		linkToFileInfo, err := os.Stat(linkToPath)
+		if err != nil {
+			return err
+		}
+		fileInfo.LinkToLocalPath = linkToPath
+		srcLinkPath := strings.TrimSuffix(path.Join(src.Fs().Root(), src.Remote()), linkSuffix)
+		dstLinkPath := strings.TrimSuffix(path.Join(o.fs.root, o.remote), linkSuffix)
+
+		fileInfo.IsDir = linkToFileInfo.IsDir()
+		derivedPathFromRelative, err := ResolveDerivedPathFromRelative(srcLinkPath, linkToPath, dstLinkPath, fileInfo.IsDir)
+		if err != nil {
+			//如果转化的路径超过了绝对路径的根路径就会报错
+			return err
+		} else {
+			fileInfo.LinkToPath = derivedPathFromRelative
+		}
+
+	}
+	tx := o.fs.db.Begin()
 	if o.id == "" {
 		result := tx.Create(&fileInfo)
 		if result.Error != nil {
@@ -150,8 +251,12 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	o.id = fileInfo.Id
 	o.modTime = fileInfo.ModTime
 	o.size = fileInfo.FileSize
-	o.fileName = fileInfo.Name
 	o.parentId = fileInfo.ParentId
+	if isLinkModeFile {
+		o.fileName = fileInfo.Name + linkSuffix
+	} else {
+		o.fileName = fileInfo.Name
+	}
 	o.remote = src.Remote()
 
 	tx.Commit()

@@ -77,6 +77,11 @@ func Unlock(key string) {
 
 // Open opens the file for read.  Call Close() on the returned io.ReadCloser
 func (o Object) Open(ctx context.Context, options ...fs.OpenOption) (io.ReadCloser, error) {
+	isLinkFile := strings.HasSuffix(o.Remote(), linkSuffix)
+	if isLinkFile {
+		readCloser, err := o.Object.Open(ctx, options...)
+		return readCloser, err
+	}
 	var rangeStart int64 = 0
 	var rangeEnd int64 = o.Size() - 1
 	for _, option := range options {

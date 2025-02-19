@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	dirRootID = "root"
+	dirRootID  = "root"
+	linkSuffix = ".rclonelink"
 )
 
 var (
@@ -72,6 +73,12 @@ postgres example: user=postgres password=yourpassword dbname=yourdbname sslmode=
 			Default:   "",
 			Advanced:  true,
 			Sensitive: true,
+		}, {
+			Name:     "isLinkFileMode",
+			Help:     "Translate symlinks to/from regular files with a '" + linkSuffix + "' extension.",
+			Default:  false,
+			NoPrefix: true,
+			Advanced: true,
 		}},
 	})
 }
@@ -98,7 +105,8 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 
 // Options defines the configuration for this backend
 type Options struct {
-	Enc encoder.MultiEncoder `config:"encoding"`
+	Enc            encoder.MultiEncoder `config:"encoding"`
+	IsLinkFileMode bool                 `config:"isLinkFileMode"`
 }
 
 // Fs represents a remote OneDrive
@@ -184,7 +192,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 			// No root so return old f
 			return f, nil
 		}
-		_, err := tempF.readMetaDataForPath(ctx, root)
+		_, err := tempF.readAbsoluteDirInfo(ctx, root)
 		if err != nil {
 			if errors.Is(err, fs.ErrorDirNotFound) || errors.Is(err, fs.ErrorObjectOrDirNotFound) {
 				// File doesn't exist so return old f
@@ -205,7 +213,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 // Return an FileInfo from a path
 // If it can't be found it returns the error fs.ErrorObjectNotFound.
-func (f *Fs) readMetaDataForPath(ctx context.Context, path string) (*FileInfo, error) {
+func (f *Fs) readAbsoluteDirInfo(ctx context.Context, path string) (*FileInfo, error) {
 	// 处理特殊情况，移除结果中的空字符串
 	var segments = pathToSegments(path)
 
@@ -220,7 +228,7 @@ func (f *Fs) readMetaDataForPath(ctx context.Context, path string) (*FileInfo, e
 			tx = f.db.Find(&foundFile, "name = ? and parent_id = ?", segment, retrievedFile.Id)
 		}
 		if tx.Error != nil {
-			return nil, errors.Wrapf(tx.Error, "db readMetaDataForPath error.path (%s),segment (%s)", path, segment)
+			return nil, errors.Wrapf(tx.Error, "db readAbsoluteDirInfo error.path (%s),segment (%s)", path, segment)
 		}
 		if len(foundFile) == 0 {
 			if i != len(segments)-1 {
@@ -270,10 +278,10 @@ func (f *Fs) Precision() time.Duration {
 
 func (f *Fs) FindLeaf(ctx context.Context, pathID, leaf string) (pathIDOut string, found bool, err error) {
 	// fs.Debugf(f, "FindLeaf(%q, %q)", pathID, leaf)
-	_, ok := f.dirCache.GetInv(pathID)
-	if !ok {
-		return "", false, errors.New("couldn't find parent ID")
-	}
+	//_, ok := f.dirCache.GetInv(pathID)
+	//if !ok {
+	//	return "", false, errors.New("couldn't find parent ID")
+	//}
 	var foundFile []FileInfo
 	tx := f.db.Find(&foundFile, "name = ? and parent_id = ?", leaf, pathID)
 	if tx.Error != nil {
@@ -373,6 +381,26 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 	if err != nil {
 		return nil, err
 	}
+	if !f.opt.IsLinkFileMode {
+		var dirFileInfo FileInfo
+		db := f.db.Find(&dirFileInfo, &FileInfo{Id: directoryID})
+		if db.Error != nil && errors.Is(db.Error, gorm.ErrRecordNotFound) {
+			return nil, fs.ErrorDirNotFound
+		}
+		if db.Error != nil {
+			return nil, errors.Wrapf(db.Error, "List: dir find error")
+		}
+		for dirFileInfo.IsLink {
+			linkToDirInfo, err := f.readAbsoluteDirInfo(ctx, dirFileInfo.LinkToPath)
+			if err != nil {
+				return nil, err
+			}
+			dirFileInfo = *linkToDirInfo
+			if !linkToDirInfo.IsLink {
+				directoryID = linkToDirInfo.Id
+			}
+		}
+	}
 
 	var foundFile []FileInfo
 	tx := f.db.Find(&foundFile, "parent_id = ?", directoryID)
@@ -391,18 +419,22 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 		} else {
 			remote = dir + "/" + file.Name
 		}
-		if file.IsDir {
-			entries = append(entries, &Dir{
-				id:       file.Id,
-				parentId: file.ParentId,
-				remote:   remote,
-				modTime:  file.ModTime,
-				size:     -1,
-				items:    -1,
-				fs:       f,
-			})
-		} else {
+		if file.IsLink && f.opt.IsLinkFileMode {
 			entries = append(entries, NewObjectFromFileInfo(&file, remote, f))
+		} else {
+			if file.IsDir {
+				entries = append(entries, &Dir{
+					id:       file.Id,
+					parentId: file.ParentId,
+					remote:   remote,
+					modTime:  file.ModTime,
+					size:     -1,
+					items:    -1,
+					fs:       f,
+				})
+			} else {
+				entries = append(entries, NewObjectFromFileInfo(&file, remote, f))
+			}
 		}
 	}
 	return entries, nil

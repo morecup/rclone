@@ -14,6 +14,11 @@ type FileInfo struct {
 	ModTime  time.Time
 	Content  []byte
 	ParentId string
+	IsLink   bool
+	//原本本地文件系统的路径
+	LinkToLocalPath string
+	//当前文件系统的绝对路径
+	LinkToPath string
 }
 
 func (fi *FileInfo) BeforeCreate(tx *gorm.DB) (err error) {

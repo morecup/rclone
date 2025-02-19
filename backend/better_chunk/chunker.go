@@ -28,6 +28,7 @@ import (
 const (
 	MaxSliceSize    = 1024 * 1024 * 29
 	CanUseSliceSize = 30408704
+	linkSuffix      = ".rclonelink"
 )
 
 func init() {
@@ -148,6 +149,11 @@ func (f Fs) PutStream(ctx context.Context, in io.Reader, src fs.ObjectInfo, opti
 }
 
 func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (fs.Object, error) {
+	isLinkFile := strings.HasSuffix(src.Remote(), linkSuffix)
+	if isLinkFile {
+		object, err := f.FileStructure.Put(ctx, in, src, options...)
+		return object, err
+	}
 	//	1.先收集所有信息
 	//	将in拆分成很多片
 	srcObject, readFromObject := src.(fs.Object)
