@@ -192,7 +192,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 			// No root so return old f
 			return f, nil
 		}
-		_, err := tempF.readAbsoluteDirInfo(ctx, root)
+		_, err := tempF.readAbsoluteFileInfo(ctx, root)
 		if err != nil {
 			if errors.Is(err, fs.ErrorDirNotFound) || errors.Is(err, fs.ErrorObjectOrDirNotFound) {
 				// File doesn't exist so return old f
@@ -213,7 +213,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 
 // Return an FileInfo from a path
 // If it can't be found it returns the error fs.ErrorObjectNotFound.
-func (f *Fs) readAbsoluteDirInfo(ctx context.Context, path string) (*FileInfo, error) {
+func (f *Fs) readAbsoluteFileInfo(ctx context.Context, path string) (*FileInfo, error) {
 	// 处理特殊情况，移除结果中的空字符串
 	var segments = pathToSegments(path)
 
@@ -228,7 +228,7 @@ func (f *Fs) readAbsoluteDirInfo(ctx context.Context, path string) (*FileInfo, e
 			tx = f.db.Find(&foundFile, "name = ? and parent_id = ?", segment, retrievedFile.Id)
 		}
 		if tx.Error != nil {
-			return nil, errors.Wrapf(tx.Error, "db readAbsoluteDirInfo error.path (%s),segment (%s)", path, segment)
+			return nil, errors.Wrapf(tx.Error, "db readAbsoluteFileInfo error.path (%s),segment (%s)", path, segment)
 		}
 		if len(foundFile) == 0 {
 			if i != len(segments)-1 {
@@ -282,6 +282,19 @@ func (f *Fs) FindLeaf(ctx context.Context, pathID, leaf string) (pathIDOut strin
 	//if !ok {
 	//	return "", false, errors.New("couldn't find parent ID")
 	//}
+	var pathIDFile FileInfo
+	find := f.db.Find(&pathIDFile, &FileInfo{Id: pathID})
+	if find.Error != nil {
+		return "", false, find.Error
+	}
+	//如果打开的软链接文件，需要特殊处理
+	if !f.opt.IsLinkFileMode && pathIDFile.IsLink {
+		linkToFileInfo, err := f.findRealLinkedToFileInfo(ctx, pathIDFile.LinkToPath, true)
+		if err != nil {
+			return "", false, err
+		}
+		pathID = linkToFileInfo.Id
+	}
 	var foundFile []FileInfo
 	tx := f.db.Find(&foundFile, "name = ? and parent_id = ?", leaf, pathID)
 	if tx.Error != nil {
@@ -375,6 +388,21 @@ func (f *Fs) findRootRelativePathFile(path string) (*FileInfo, error) {
 	return &retrievedFile, nil
 }
 
+func (f *Fs) findRealLinkedToFileInfo(ctx context.Context, linkToPath string, findDir bool) (linkToFileInfo *FileInfo, err error) {
+	for linkToFileInfo == nil || linkToFileInfo.IsLink {
+		linkToFileInfo, err = f.readAbsoluteFileInfo(ctx, linkToPath)
+		if err != nil {
+			return nil, err
+		}
+		if findDir && !linkToFileInfo.IsDir {
+			return nil, fs.ErrorIsFile
+		} else if !findDir && linkToFileInfo.IsDir {
+			return nil, fs.ErrorIsDir
+		}
+	}
+	return linkToFileInfo, nil
+}
+
 // List entries normal need to implement fs.Directory or fs.Object ,dir is relative path,f.root is base path
 func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err error) {
 	directoryID, err := f.dirCache.FindDir(ctx, dir, false)
@@ -390,15 +418,12 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 		if db.Error != nil {
 			return nil, errors.Wrapf(db.Error, "List: dir find error")
 		}
-		for dirFileInfo.IsLink {
-			linkToDirInfo, err := f.readAbsoluteDirInfo(ctx, dirFileInfo.LinkToPath)
+		if dirFileInfo.IsLink {
+			realFileInfo, err := f.findRealLinkedToFileInfo(ctx, dirFileInfo.LinkToPath, true)
 			if err != nil {
 				return nil, err
 			}
-			dirFileInfo = *linkToDirInfo
-			if !linkToDirInfo.IsLink {
-				directoryID = linkToDirInfo.Id
-			}
+			directoryID = realFileInfo.Id
 		}
 	}
 

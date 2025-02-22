@@ -20,13 +20,15 @@ import (
 //
 // Will definitely have info but maybe not meta
 type Object struct {
-	fs       *Fs       // what this object is part of
-	remote   string    // The remote path  base root relativePath path,have file name
-	size     int64     // size of the object
-	modTime  time.Time // modification time of the object
-	id       string    // ID of the object
-	parentId string
-	fileName string
+	fs         *Fs       // what this object is part of
+	remote     string    // The remote path  base root relativePath path,have file name
+	size       int64     // size of the object
+	modTime    time.Time // modification time of the object
+	id         string    // ID of the object
+	parentId   string
+	fileName   string
+	isLink     bool
+	linkToPath string
 }
 
 // ------------------------------------------------------------
@@ -43,13 +45,15 @@ func NewObjectFromFileInfo(file *FileInfo, absolutePath string, f *Fs) *Object {
 		}
 	} else {
 		return &Object{
-			id:       file.Id,
-			parentId: file.ParentId,
-			remote:   absolutePath,
-			modTime:  file.ModTime,
-			size:     file.FileSize,
-			fs:       f,
-			fileName: file.Name,
+			id:         file.Id,
+			parentId:   file.ParentId,
+			remote:     absolutePath,
+			modTime:    file.ModTime,
+			size:       file.FileSize,
+			fs:         f,
+			fileName:   file.Name,
+			isLink:     file.IsLink,
+			linkToPath: file.LinkToPath,
 		}
 	}
 }
@@ -102,11 +106,20 @@ func (o *Object) Storable() bool {
 }
 
 func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.ReadCloser, err error) {
+	realOpenFileId := o.id
+
 	//如果打开的软链接文件，需要特殊处理
+	if !o.fs.opt.IsLinkFileMode && o.isLink {
+		linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, o.linkToPath, false)
+		if err != nil {
+			return nil, err
+		}
+		realOpenFileId = linkToFileInfo.Id
+	}
 
 	fs.FixRangeOption(options, o.size)
 	var fileInfo FileInfo
-	result := o.fs.db.Select("content", "is_dir").First(&fileInfo, "id = ?", o.id)
+	result := o.fs.db.Select("content", "is_dir").First(&fileInfo, "id = ?", realOpenFileId)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, fs.ErrorObjectNotFound
@@ -185,7 +198,6 @@ func convertWindowsPathToLinuxStyle(windowsPath string) string {
 //
 // The new object may have been created if an error is returned 可能本身这个object就不存在？？
 func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ...fs.OpenOption) (err error) {
-	//如果是更新软链接文件内容，则需要更新链接到的文件的内容
 
 	allByte, err := io.ReadAll(in)
 	if err != nil {
@@ -230,7 +242,12 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		} else {
 			fileInfo.LinkToPath = derivedPathFromRelative
 		}
-
+		////	文件夹链接大小定为-1，文件链接大小定为0
+		//if linkToFileInfo.IsDir() {
+		//	fileInfo.FileSize = -1
+		//} else {
+		//	fileInfo.FileSize = 0
+		//}
 	}
 	tx := o.fs.db.Begin()
 	if o.id == "" {
@@ -240,10 +257,47 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 			return errors.Wrapf(result.Error, "Error update object %s", o)
 		}
 	} else {
-		result := tx.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
-		if result.Error != nil {
+		//如果是更新软链接文件内容，则需要更新链接到的文件的内容
+		//只有原本文件存在时，才会进行更新，如果文件不存在，则应该是走创建链接文件的逻辑，而不是这里
+		var oldFileInfo FileInfo
+		db := tx.Find(&oldFileInfo, &FileInfo{Id: o.id})
+		if db.Error != nil && !errors.Is(db.Error, gorm.ErrRecordNotFound) {
 			tx.Rollback()
-			return errors.Wrapf(result.Error, "Error update object %s", o)
+			return errors.Wrapf(db.Error, "Error update object %s", o)
+		}
+		if errors.Is(db.Error, gorm.ErrRecordNotFound) {
+			result := tx.Create(&fileInfo)
+			if result.Error != nil {
+				tx.Rollback()
+				return errors.Wrapf(result.Error, "Error update object %s", o)
+			}
+		}
+
+		//如果打开的软链接文件，需要特殊处理
+		if !o.fs.opt.IsLinkFileMode && oldFileInfo.IsLink {
+			linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, o.linkToPath, false)
+			if err != nil {
+				return err
+			}
+			//	更新真正链接到的文件的内容
+			updates := tx.Model(&FileInfo{}).Where("id = ?", linkToFileInfo.Id).Updates(&FileInfo{
+				FileSize: int64(len(allByte)),
+				Content:  allByte,
+				ModTime:  src.ModTime(ctx),
+			})
+			if updates.Error != nil {
+				tx.Rollback()
+				return errors.Wrapf(updates.Error, "Error update object %s", o)
+			}
+			//不用更新软链接本身的modTime
+			tx.Commit()
+			return nil
+		} else {
+			result := tx.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
+			if result.Error != nil {
+				tx.Rollback()
+				return errors.Wrapf(result.Error, "Error update object %s", o)
+			}
 		}
 	}
 
