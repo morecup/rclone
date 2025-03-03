@@ -18,6 +18,7 @@ import (
 	"io"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -158,7 +159,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	dbType, _ := m.Get("db_type")
 	var dialector gorm.Dialector
 	if dbType == "sqlite" {
-		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(60000)&_pragma=journal_mode(WAL)", dsn)
+		dsn = fmt.Sprintf("%s?_busy_timeout=60000&_journal_mode=WAL", dsn)
 		dialector = sqlite.Open(dsn)
 	} else if dbType == "mysql" {
 		dialector = mysql.Open(dsn)
@@ -171,12 +172,18 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	if err != nil {
 		return nil, errors.Wrapf(err, "%s can not connect", dsn)
 	}
-	db.Config.Logger = logger.Default.LogMode(logger.Error)
+	db.Config.Logger = logger.Default.LogMode(logger.Silent)
 	f.db = db
-	// 显式启用 WAL（部分环境需二次确认）
-	if dbType == "sqlite" {
-		db.Exec("PRAGMA journal_mode=WAL;")
+	//// 显式启用 WAL（部分环境需二次确认）
+	//if dbType == "sqlite" {
+	//	db.Exec("PRAGMA journal_mode=WAL;")
+	//}
+	var timeout int
+	err = db.Raw("PRAGMA busy_timeout").Row().Scan(&timeout)
+	if err != nil {
+		return nil, err
 	}
+	fs.Debugf(f, "Current busy_timeout:"+strconv.Itoa(timeout)) // 预期输出 60000
 	var journalMode string
 	db.Raw("PRAGMA journal_mode;").Scan(&journalMode)
 	fs.Debugf(f, "当前 journal 模式:"+journalMode)
