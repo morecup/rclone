@@ -249,21 +249,27 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		//	fileInfo.FileSize = 0
 		//}
 	}
-	tx := o.fs.db.Begin()
-	var oldFileInfo FileInfo
-	db := tx.Find(&oldFileInfo, &FileInfo{ParentId: o.parentId, Name: o.fileName})
-	if db.Error != nil && !errors.Is(db.Error, gorm.ErrRecordNotFound) {
-		tx.Rollback()
+	tx := o.fs.db
+	var oldFileInfos []FileInfo
+	db := tx.Find(&oldFileInfos, &FileInfo{ParentId: o.parentId, Name: o.fileName})
+	if db.Error != nil {
+		//tx.Rollback()
 		return errors.Wrapf(db.Error, "Error update object %s", o)
 	}
-	if errors.Is(db.Error, gorm.ErrRecordNotFound) {
+	if len(oldFileInfos) > 1 {
+		//tx.Rollback()
+		return errors.Errorf("found %d same name file in db.o: %s", len(oldFileInfos), o)
+	}
+
+	if len(oldFileInfos) == 0 {
 		fileInfo.Id = ""
 		result := tx.Create(&fileInfo)
 		if result.Error != nil {
-			tx.Rollback()
+			//tx.Rollback()
 			return errors.Wrapf(result.Error, "Error update object %s", o)
 		}
 	} else {
+		oldFileInfo := oldFileInfos[0]
 		//如果是更新软链接文件内容，则需要更新链接到的文件的内容
 		//只有原本文件存在时，才会进行更新，如果文件不存在，则应该是走创建链接文件的逻辑，而不是这里
 		//如果打开的软链接文件，需要特殊处理
@@ -279,17 +285,17 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 				ModTime:  src.ModTime(ctx),
 			})
 			if updates.Error != nil {
-				tx.Rollback()
+				//tx.Rollback()
 				return errors.Wrapf(updates.Error, "Error update object %s", o)
 			}
 			//不用更新软链接本身的modTime
-			tx.Commit()
+			//tx.Commit()
 			return nil
 		} else {
 			fileInfo.Id = oldFileInfo.Id
 			result := tx.Model(&FileInfo{}).Where("id = ?", oldFileInfo.Id).Updates(fileInfo)
 			if result.Error != nil {
-				tx.Rollback()
+				//tx.Rollback()
 				return errors.Wrapf(result.Error, "Error update object %s", o)
 			}
 		}
@@ -307,7 +313,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	}
 	o.remote = src.Remote()
 
-	tx.Commit()
+	//tx.Commit()
 	return err
 }
 
