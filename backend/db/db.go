@@ -158,6 +158,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	dbType, _ := m.Get("db_type")
 	var dialector gorm.Dialector
 	if dbType == "sqlite" {
+		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(60000)&_pragma=journal_mode(WAL)", dsn)
 		dialector = sqlite.Open(dsn)
 	} else if dbType == "mysql" {
 		dialector = mysql.Open(dsn)
@@ -172,6 +173,13 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 	db.Config.Logger = logger.Default.LogMode(logger.Error)
 	f.db = db
+	// 显式启用 WAL（部分环境需二次确认）
+	if dbType == "sqlite" {
+		db.Exec("PRAGMA journal_mode=WAL;")
+	}
+	var journalMode string
+	db.Raw("PRAGMA journal_mode;").Scan(&journalMode)
+	fs.Debugf(f, "当前 journal 模式:"+journalMode)
 	err = db.AutoMigrate(&FileInfo{})
 	if err != nil {
 		return nil, err
