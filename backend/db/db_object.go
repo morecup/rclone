@@ -250,7 +250,14 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		//}
 	}
 	tx := o.fs.db.Begin()
-	if o.id == "" {
+	var oldFileInfo FileInfo
+	db := tx.Find(&oldFileInfo, &FileInfo{ParentId: o.parentId, Name: o.fileName})
+	if db.Error != nil && !errors.Is(db.Error, gorm.ErrRecordNotFound) {
+		tx.Rollback()
+		return errors.Wrapf(db.Error, "Error update object %s", o)
+	}
+	if errors.Is(db.Error, gorm.ErrRecordNotFound) {
+		fileInfo.Id = ""
 		result := tx.Create(&fileInfo)
 		if result.Error != nil {
 			tx.Rollback()
@@ -259,23 +266,9 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	} else {
 		//如果是更新软链接文件内容，则需要更新链接到的文件的内容
 		//只有原本文件存在时，才会进行更新，如果文件不存在，则应该是走创建链接文件的逻辑，而不是这里
-		var oldFileInfo FileInfo
-		db := tx.Find(&oldFileInfo, &FileInfo{Id: o.id})
-		if db.Error != nil && !errors.Is(db.Error, gorm.ErrRecordNotFound) {
-			tx.Rollback()
-			return errors.Wrapf(db.Error, "Error update object %s", o)
-		}
-		if errors.Is(db.Error, gorm.ErrRecordNotFound) {
-			result := tx.Create(&fileInfo)
-			if result.Error != nil {
-				tx.Rollback()
-				return errors.Wrapf(result.Error, "Error update object %s", o)
-			}
-		}
-
 		//如果打开的软链接文件，需要特殊处理
 		if !o.fs.opt.IsLinkFileMode && oldFileInfo.IsLink {
-			linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, o.linkToPath, false)
+			linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, oldFileInfo.LinkToPath, false)
 			if err != nil {
 				return err
 			}
@@ -293,7 +286,8 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 			tx.Commit()
 			return nil
 		} else {
-			result := tx.Model(&FileInfo{}).Where("id = ?", o.id).Updates(fileInfo)
+			fileInfo.Id = oldFileInfo.Id
+			result := tx.Model(&FileInfo{}).Where("id = ?", oldFileInfo.Id).Updates(fileInfo)
 			if result.Error != nil {
 				tx.Rollback()
 				return errors.Wrapf(result.Error, "Error update object %s", o)
