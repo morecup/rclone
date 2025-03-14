@@ -3,6 +3,8 @@ package paths
 import (
 	"errors"
 	errors2 "github.com/pkg/errors"
+	"path/filepath"
+	"strings"
 )
 
 var ExceedsRootDirError = errors.New("path exceeds the root directory")
@@ -150,4 +152,41 @@ func Clean(path string) (string, error) {
 	}
 
 	return out.string(), nil
+}
+
+// IsAbs reports whether the path is absolute.
+func IsAbs(path string) bool {
+	// 统一替换为Linux风格的斜杠
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+
+	// 检查Linux绝对路径（以/开头）
+	if strings.HasPrefix(normalizedPath, "/") {
+		return true
+	}
+
+	// 检查Windows绝对路径（盘符路径）
+	if len(normalizedPath) >= 3 {
+		// 验证盘符格式（字母 + :/）
+		if c := normalizedPath[0]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			if normalizedPath[1] == ':' && normalizedPath[2] == '/' {
+				return true
+			}
+		}
+	}
+
+	// 检查Windows UNC路径（以//开头）
+	if strings.HasPrefix(normalizedPath, "//") {
+		return true
+	}
+
+	return false
+}
+func JoinTwoPath(filePath string, relPath string) string {
+	// 获取文件所在目录（自动清理路径）
+	dir := filepath.Dir(filePath)
+
+	// 拼接目录和相对路径
+	result := filepath.Join(dir, relPath)
+
+	return filepath.ToSlash(result)
 }
