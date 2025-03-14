@@ -20,15 +20,16 @@ import (
 //
 // Will definitely have info but maybe not meta
 type Object struct {
-	fs         *Fs       // what this object is part of
-	remote     string    // The remote path  base root relativePath path,have file name
-	size       int64     // size of the object
-	modTime    time.Time // modification time of the object
-	id         string    // ID of the object
-	parentId   string
-	fileName   string
-	isLink     bool
-	linkToPath string
+	fs              *Fs       // what this object is part of
+	remote          string    // The remote path  base root relativePath path,have file name
+	size            int64     // size of the object
+	modTime         time.Time // modification time of the object
+	id              string    // ID of the object
+	parentId        string
+	fileName        string
+	isLink          bool
+	linkToPath      string // 如果linkToPath为""则软链接为相对路径，使用LinkToLocalPath
+	LinkToLocalPath string
 }
 
 // ------------------------------------------------------------
@@ -45,15 +46,16 @@ func NewObjectFromFileInfo(file *FileInfo, absolutePath string, f *Fs) *Object {
 		}
 	} else {
 		return &Object{
-			id:         file.Id,
-			parentId:   file.ParentId,
-			remote:     absolutePath,
-			modTime:    file.ModTime,
-			size:       file.FileSize,
-			fs:         f,
-			fileName:   file.Name,
-			isLink:     file.IsLink,
-			linkToPath: file.LinkToPath,
+			id:              file.Id,
+			parentId:        file.ParentId,
+			remote:          absolutePath,
+			modTime:         file.ModTime,
+			size:            file.FileSize,
+			fs:              f,
+			fileName:        file.Name,
+			isLink:          file.IsLink,
+			linkToPath:      file.LinkToPath,
+			LinkToLocalPath: file.LinkToLocalPath,
 		}
 	}
 }
@@ -97,6 +99,10 @@ func (o *Object) ModTime(ctx context.Context) time.Time {
 // SetModTime sets the modification time of the local fs object
 func (o *Object) SetModTime(ctx context.Context, modTime time.Time) error {
 	o.modTime = modTime
+	result := o.fs.db.Where("id = ?", o.id).Updates(FileInfo{ModTime: modTime})
+	if result.Error != nil {
+		return errors.Wrap(result.Error, "SetModTime error")
+	}
 	return nil
 }
 
@@ -110,7 +116,7 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 
 	//如果打开的软链接文件，需要特殊处理
 	if !o.fs.opt.IsLinkFileMode && o.isLink {
-		linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, o.linkToPath, false)
+		linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, FileInfo{IsDir: false, LinkToLocalPath: o.LinkToLocalPath, LinkToPath: o.linkToPath, IsLink: o.isLink}, false)
 		if err != nil {
 			return nil, err
 		}
@@ -226,22 +232,28 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		//}
 
 		linkToPath := string(allByte)
-		linkToFileInfo, err := os.Stat(linkToPath)
-		if err != nil {
-			return err
-		}
-		fileInfo.LinkToLocalPath = linkToPath
-		srcLinkPath := strings.TrimSuffix(path.Join(src.Fs().Root(), src.Remote()), linkSuffix)
-		dstLinkPath := strings.TrimSuffix(path.Join(o.fs.root, o.remote), linkSuffix)
+		if paths.IsAbs(linkToPath) {
+			linkToFileInfo, err := os.Stat(linkToPath)
+			if err != nil {
+				return err
+			}
+			fileInfo.LinkToLocalPath = linkToPath
+			srcLinkPath := strings.TrimSuffix(path.Join(src.Fs().Root(), src.Remote()), linkSuffix)
+			dstLinkPath := strings.TrimSuffix(path.Join(o.fs.root, o.remote), linkSuffix)
 
-		fileInfo.IsDir = linkToFileInfo.IsDir()
-		derivedPathFromRelative, err := ResolveDerivedPathFromRelative(srcLinkPath, linkToPath, dstLinkPath, fileInfo.IsDir)
-		if err != nil {
-			//如果转化的路径超过了绝对路径的根路径就会报错
-			return err
+			fileInfo.IsDir = linkToFileInfo.IsDir()
+			derivedPathFromRelative, err := ResolveDerivedPathFromRelative(srcLinkPath, linkToPath, dstLinkPath, fileInfo.IsDir)
+			if err != nil {
+				//如果转化的路径超过了绝对路径的根路径就会报错
+				return err
+			} else {
+				fileInfo.LinkToPath = derivedPathFromRelative
+			}
 		} else {
-			fileInfo.LinkToPath = derivedPathFromRelative
+			fileInfo.LinkToLocalPath = ""
+			fileInfo.LinkToPath = linkToPath
 		}
+
 		////	文件夹链接大小定为-1，文件链接大小定为0
 		//if linkToFileInfo.IsDir() {
 		//	fileInfo.FileSize = -1
@@ -251,7 +263,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 	}
 	tx := o.fs.db
 	var oldFileInfos []FileInfo
-	db := tx.Find(&oldFileInfos, &FileInfo{ParentId: o.parentId, Name: o.fileName})
+	db := tx.Find(&oldFileInfos, &FileInfo{ParentId: o.parentId, Name: fileInfo.Name})
 	if db.Error != nil {
 		//tx.Rollback()
 		return errors.Wrapf(db.Error, "Error update object %s", o)
@@ -274,7 +286,7 @@ func (o *Object) Update(ctx context.Context, in io.Reader, src fs.ObjectInfo, op
 		//只有原本文件存在时，才会进行更新，如果文件不存在，则应该是走创建链接文件的逻辑，而不是这里
 		//如果打开的软链接文件，需要特殊处理
 		if !o.fs.opt.IsLinkFileMode && oldFileInfo.IsLink {
-			linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, oldFileInfo.LinkToPath, false)
+			linkToFileInfo, err := o.fs.findRealLinkedToFileInfo(ctx, oldFileInfo, false)
 			if err != nil {
 				return err
 			}

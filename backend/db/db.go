@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm/logger"
 	"io"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -304,7 +305,7 @@ func (f *Fs) FindLeaf(ctx context.Context, pathID, leaf string) (pathIDOut strin
 	}
 	//如果打开的软链接文件，需要特殊处理
 	if !f.opt.IsLinkFileMode && pathIDFile.IsLink {
-		linkToFileInfo, err := f.findRealLinkedToFileInfo(ctx, pathIDFile.LinkToPath, true)
+		linkToFileInfo, err := f.findRealLinkedToFileInfo(ctx, pathIDFile, true)
 		if err != nil {
 			return "", false, err
 		}
@@ -402,20 +403,55 @@ func (f *Fs) findRootRelativePathFile(path string) (*FileInfo, error) {
 	}
 	return &retrievedFile, nil
 }
-
-func (f *Fs) findRealLinkedToFileInfo(ctx context.Context, linkToPath string, findDir bool) (linkToFileInfo *FileInfo, err error) {
-	for linkToFileInfo == nil || linkToFileInfo.IsLink {
-		linkToFileInfo, err = f.readAbsoluteFileInfo(ctx, linkToPath)
+func (f *Fs) findAbsolutePathFromFileInfo(fileInfo FileInfo) (absolutePath string, err error) {
+	for fileInfo.Id != rootDir.Id {
+		if absolutePath == "" {
+			absolutePath = fileInfo.Name
+		} else {
+			absolutePath = fileInfo.Name + "/" + absolutePath
+		}
+		var foundFile []FileInfo
+		tx := f.db.Find(&foundFile, &FileInfo{Id: fileInfo.ParentId})
+		if tx.Error != nil {
+			return "", errors.Wrapf(tx.Error, "db find error")
+		}
+		if len(foundFile) == 0 {
+			return "", errors.Errorf("can not found parent fileinfo in db. id (%s)", fileInfo.Id)
+		}
+		if len(foundFile) > 1 {
+			return "", errors.Errorf("found %d parent fileinfo in db. id (%s)", len(foundFile), fileInfo.Id)
+		}
+		fileInfo = foundFile[0]
+	}
+	absolutePath = "/" + absolutePath
+	return absolutePath, nil
+}
+func (f *Fs) findRealLinkedToFileInfo(ctx context.Context, fileInfo FileInfo, findDir bool) (*FileInfo, error) {
+	for fileInfo.IsLink {
+		var linkToPath = fileInfo.LinkToPath
+		if fileInfo.LinkToPath == "" {
+			absolutePath, err := f.findAbsolutePathFromFileInfo(fileInfo)
+			if err != nil {
+				return nil, err
+			}
+			if fileInfo.IsDir {
+				linkToPath = path.Join(absolutePath, filepath.ToSlash(fileInfo.LinkToLocalPath))
+			} else {
+				linkToPath = path.Join(path.Dir(absolutePath), filepath.ToSlash(fileInfo.LinkToLocalPath))
+			}
+		}
+		fileInfoTemp, err := f.readAbsoluteFileInfo(ctx, linkToPath)
 		if err != nil {
 			return nil, err
 		}
-		if findDir && !linkToFileInfo.IsDir {
+		if findDir && !fileInfoTemp.IsDir {
 			return nil, fs.ErrorIsFile
-		} else if !findDir && linkToFileInfo.IsDir {
+		} else if !findDir && fileInfoTemp.IsDir {
 			return nil, fs.ErrorIsDir
 		}
+		fileInfo = *fileInfoTemp
 	}
-	return linkToFileInfo, nil
+	return &fileInfo, nil
 }
 
 // List entries normal need to implement fs.Directory or fs.Object ,dir is relative path,f.root is base path
@@ -434,7 +470,7 @@ func (f *Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err e
 			return nil, errors.Wrapf(db.Error, "List: dir find error")
 		}
 		if dirFileInfo.IsLink {
-			realFileInfo, err := f.findRealLinkedToFileInfo(ctx, dirFileInfo.LinkToPath, true)
+			realFileInfo, err := f.findRealLinkedToFileInfo(ctx, dirFileInfo, true)
 			if err != nil {
 				return nil, err
 			}
