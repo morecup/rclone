@@ -590,6 +590,8 @@ func (f *Fs) PreCreate(ctx context.Context, reader *readers.RepeatableReader, lo
 		if err != nil {
 			if err == io.EOF {
 				break
+			} else if !errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil, nil, nil, err
 			}
 		}
 		if isFirst {
