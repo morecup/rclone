@@ -104,7 +104,7 @@ func (b *BaiduClient) CallJSONIgnore(ctx context.Context, opts *rest.Opts, reque
 				return resp, nil
 			}
 		}
-		return resp, errors.WithStack(fmt.Errorf("esponse error %d ,opts: %+v,rresp: %+v ,response body: %+v", response.GetErrno(), opts, resp, response))
+		return resp, errors.WithStack(fmt.Errorf("opts: %+v,response error %d ,resp: %+v ,response body: %+v", opts, response.GetErrno(), resp, response))
 	}
 
 	return resp, nil

@@ -173,7 +173,7 @@ func errorHandler(resp *http.Response) error {
 	//	errResponse.ErrorInfo.Code = resp.Status
 	//}
 	//return errResponse
-	return fmt.Errorf("error response %v", resp)
+	return errors.WithStack(fmt.Errorf("errorHandler request: %+v,response error %d ,resp: %+v ", resp.Request, resp.StatusCode, resp))
 }
 
 // parsePath parses a OneDrive 'url'
