@@ -115,6 +115,14 @@ func (f Fs) List(ctx context.Context, dir string) (entries fs.DirEntries, err er
 					}
 					realDirEntries = append(realDirEntries, object)
 				}
+			} else {
+				realDirEntries = append(realDirEntries, &Object{
+					Object:     entry,
+					remote:     entry.Remote(),
+					remoteReal: entry.Remote(),
+					size:       entry.Size(),
+					fs:         f,
+				})
 			}
 		case fs.Directory:
 			realDirEntries = append(realDirEntries, entry)
@@ -427,7 +435,7 @@ func NewFs(ctx context.Context, name, rpath string, m configmap.Mapper) (fs.Fs, 
 	if isFile {
 		rpath = filepath.Dir(rpath)
 	}
-	fileStoreRemote, err := getFsFromRemoteBase(ctx, rpath, opt.FileStoreRemote)
+	fileStoreRemote, err := getFsFromRemoteBase(ctx, "", opt.FileStoreRemote)
 	if err != nil {
 		return nil, err
 	}
