@@ -333,7 +333,12 @@ func Run(Retry bool, showStats bool, cmd *cobra.Command, f func() error) {
 		if nerrs <= 1 {
 			fs.Logf(nil, "Failed to %s: %v", cmd.Name(), cmdErr)
 		} else {
-			fs.Logf(nil, "Failed to %s with %d errors: last error was: %v", cmd.Name(), nerrs, cmdErr)
+			var errorDetails strings.Builder
+			for i, err := range accounting.GlobalStats().GetErrorList() {
+				errorDetails.WriteString(fmt.Sprintf("Error %d: %v\n", i+1, err))
+			}
+			fs.Logf(nil, "Failed to %s with %d errors:\n%s", cmd.Name(), nerrs, errorDetails.String())
+
 		}
 	}
 	resolveExitCode(cmdErr)

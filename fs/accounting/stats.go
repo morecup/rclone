@@ -34,6 +34,7 @@ type StatsInfo struct {
 	bytes               int64
 	errors              int64
 	lastError           error
+	errorList           []error
 	fatalError          bool
 	retryError          bool
 	retryAfter          time.Time
@@ -594,6 +595,13 @@ func (s *StatsInfo) GetLastError() error {
 	return s.lastError
 }
 
+// GetErrorList returns the errorList
+func (s *StatsInfo) GetErrorList() []error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.errorList
+}
+
 // GetChecks returns the number of checks
 func (s *StatsInfo) GetChecks() int64 {
 	s.mu.RLock()
@@ -686,6 +694,7 @@ func (s *StatsInfo) ResetCounters() {
 	s.bytes = 0
 	s.errors = 0
 	s.lastError = nil
+	s.errorList = nil
 	s.fatalError = false
 	s.retryError = false
 	s.retryAfter = time.Time{}
@@ -708,6 +717,7 @@ func (s *StatsInfo) ResetErrors() {
 	defer s.mu.Unlock()
 	s.errors = 0
 	s.lastError = nil
+	s.errorList = nil
 	s.fatalError = false
 	s.retryError = false
 	s.retryAfter = time.Time{}
@@ -729,6 +739,7 @@ func (s *StatsInfo) Error(err error) error {
 	defer s.mu.Unlock()
 	s.errors++
 	s.lastError = err
+	s.errorList = append(s.errorList, err)
 	err = fserrors.FsError(err)
 	fserrors.Count(err)
 	switch {

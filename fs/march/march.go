@@ -4,6 +4,7 @@ package march
 import (
 	"context"
 	"fmt"
+	errors2 "github.com/pkg/errors"
 	"path"
 	"sort"
 	"strings"
@@ -411,8 +412,10 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 	wg.Wait()
 	if srcListErr != nil {
 		if job.srcRemote != "" {
+			srcListErr = errors2.Wrapf(srcListErr, "%s: error reading source directory:", job.srcRemote)
 			fs.Errorf(job.srcRemote, "error reading source directory: %v", srcListErr)
 		} else {
+			srcListErr = errors2.Wrapf(srcListErr, "%v: error reading source directory:", m.Fsrc)
 			fs.Errorf(m.Fsrc, "error reading source root directory: %v", srcListErr)
 		}
 		srcListErr = fs.CountError(m.Ctx, srcListErr)
@@ -422,8 +425,10 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		// Copy the stuff anyway
 	} else if dstListErr != nil {
 		if job.dstRemote != "" {
+			dstListErr = errors2.Wrapf(dstListErr, "%s: error reading destination directory:", job.dstRemote)
 			fs.Errorf(job.dstRemote, "error reading destination directory: %v", dstListErr)
 		} else {
+			dstListErr = errors2.Wrapf(dstListErr, "%v: error reading destination root directory:", m.Fsrc)
 			fs.Errorf(m.Fdst, "error reading destination root directory: %v", dstListErr)
 		}
 		dstListErr = fs.CountError(m.Ctx, dstListErr)
