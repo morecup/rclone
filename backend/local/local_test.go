@@ -4,8 +4,8 @@ package local_test
 import (
 	"testing"
 
-	"github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/fstest/fstests"
+	"github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/fstest/fstests"
 )
 
 // TestIntegration runs integration tests against the remote

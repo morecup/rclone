@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-systemd/v22/journal"
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 )
 
 // Enables systemd logs if configured or if auto-detected

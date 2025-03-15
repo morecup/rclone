@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rclone/rclone/backend/crypt"
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/flags"
+	"github.com/morecup/rclone/backend/crypt"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/flags"
 	"github.com/spf13/cobra"
 )
 

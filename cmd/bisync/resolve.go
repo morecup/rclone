@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/cmd/bisync/bilib"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/lib/terminal"
+	"github.com/morecup/rclone/cmd/bisync/bilib"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/lib/terminal"
 )
 
 // Prefer describes strategies for resolving sync conflicts

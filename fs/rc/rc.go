@@ -13,8 +13,8 @@ import (
 	_ "net/http/pprof" // install the pprof http handlers
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	libhttp "github.com/rclone/rclone/lib/http"
+	"github.com/morecup/rclone/fs"
+	libhttp "github.com/morecup/rclone/lib/http"
 )
 
 // OptionsInfo describes the Options in use

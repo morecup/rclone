@@ -8,12 +8,12 @@ import (
 
 	mutex "sync" // renamed as "sync" already in use
 
-	"github.com/rclone/rclone/cmd"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/flags"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fs/operations/operationsflags"
-	"github.com/rclone/rclone/fs/sync"
+	"github.com/morecup/rclone/cmd"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/flags"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/fs/operations/operationsflags"
+	"github.com/morecup/rclone/fs/sync"
 	"github.com/spf13/cobra"
 )
 
@@ -174,7 +174,7 @@ the backend supports it. If metadata syncing is required then use the
 ` + "`--metadata`" + ` flag.
 
 Note that the modification time and metadata for the root directory
-will **not** be synced. See https://github.com/rclone/rclone/issues/7652
+will **not** be synced. See https://github.com/morecup/rclone/issues/7652
 for more info.
 
 **Note**: Use the ` + "`-P`" + `/` + "`--progress`" + ` flag to view real-time transfer statistics

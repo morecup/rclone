@@ -9,9 +9,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fstest"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/fstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

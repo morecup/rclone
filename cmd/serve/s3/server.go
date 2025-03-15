@@ -12,15 +12,15 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/morecup/rclone/cmd/serve/proxy"
+	"github.com/morecup/rclone/cmd/serve/proxy/proxyflags"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/hash"
+	httplib "github.com/morecup/rclone/lib/http"
+	"github.com/morecup/rclone/vfs"
+	"github.com/morecup/rclone/vfs/vfscommon"
 	"github.com/rclone/gofakes3"
 	"github.com/rclone/gofakes3/signature"
-	"github.com/rclone/rclone/cmd/serve/proxy"
-	"github.com/rclone/rclone/cmd/serve/proxy/proxyflags"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/hash"
-	httplib "github.com/rclone/rclone/lib/http"
-	"github.com/rclone/rclone/vfs"
-	"github.com/rclone/rclone/vfs/vfscommon"
 )
 
 type ctxKey int

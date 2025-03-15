@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/lib/mmap"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/lib/mmap"
 )
 
 // Pool of internal buffers

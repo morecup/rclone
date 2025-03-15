@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/fs/operations"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/lib/ranges"
-	"github.com/rclone/rclone/lib/readers"
-	"github.com/rclone/rclone/vfs/vfscommon"
+	_ "github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/fs/operations"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/lib/ranges"
+	"github.com/morecup/rclone/lib/readers"
+	"github.com/morecup/rclone/vfs/vfscommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

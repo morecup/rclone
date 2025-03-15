@@ -6,8 +6,8 @@ package storj_test
 import (
 	"testing"
 
-	"github.com/rclone/rclone/backend/storj"
-	"github.com/rclone/rclone/fstest/fstests"
+	"github.com/morecup/rclone/backend/storj"
+	"github.com/morecup/rclone/fstest/fstests"
 )
 
 // TestIntegration runs integration tests against the remote

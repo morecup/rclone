@@ -17,19 +17,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/backend/ulozto/api"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/config/configstruct"
-	"github.com/rclone/rclone/fs/config/obscure"
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/fs/fshttp"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/lib/dircache"
-	"github.com/rclone/rclone/lib/encoder"
-	"github.com/rclone/rclone/lib/pacer"
-	"github.com/rclone/rclone/lib/rest"
+	"github.com/morecup/rclone/backend/ulozto/api"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configstruct"
+	"github.com/morecup/rclone/fs/config/obscure"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/fs/fshttp"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/lib/dircache"
+	"github.com/morecup/rclone/lib/encoder"
+	"github.com/morecup/rclone/lib/pacer"
+	"github.com/morecup/rclone/lib/rest"
 )
 
 // TODO Uloz.to only supports file names of 255 characters or less and silently truncates names that are longer.
@@ -121,7 +121,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, err
 	}
 
-	// Strip leading and trailing slashes, see https://github.com/rclone/rclone/issues/7796 for details.
+	// Strip leading and trailing slashes, see https://github.com/morecup/rclone/issues/7796 for details.
 	root = strings.Trim(root, "/")
 
 	client := fshttp.NewClient(ctx)

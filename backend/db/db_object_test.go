@@ -2,7 +2,7 @@ package db
 
 import (
 	"errors"
-	"github.com/rclone/rclone/lib/paths"
+	"github.com/morecup/rclone/lib/paths"
 	"testing"
 )
 

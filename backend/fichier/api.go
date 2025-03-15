@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/lib/rest"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/lib/rest"
 )
 
 // retryErrorCodes is a slice of error codes that we will retry

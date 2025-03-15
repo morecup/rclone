@@ -4,21 +4,21 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/morecup/rclone/backend/baidu_netdisk/api"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/configstruct"
+	"github.com/morecup/rclone/fs/config/obscure"
+	"github.com/morecup/rclone/fs/fshttp"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/lib/dircache"
+	"github.com/morecup/rclone/lib/encoder"
+	"github.com/morecup/rclone/lib/oauthutil"
+	"github.com/morecup/rclone/lib/pacer"
+	"github.com/morecup/rclone/lib/persistjar"
+	"github.com/morecup/rclone/lib/rest"
 	"github.com/pkg/errors"
-	"github.com/rclone/rclone/backend/baidu_netdisk/api"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/config/configstruct"
-	"github.com/rclone/rclone/fs/config/obscure"
-	"github.com/rclone/rclone/fs/fshttp"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/lib/dircache"
-	"github.com/rclone/rclone/lib/encoder"
-	"github.com/rclone/rclone/lib/oauthutil"
-	"github.com/rclone/rclone/lib/pacer"
-	"github.com/rclone/rclone/lib/persistjar"
-	"github.com/rclone/rclone/lib/rest"
 	"golang.org/x/net/publicsuffix"
 	"golang.org/x/oauth2"
 	"io"
@@ -332,7 +332,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 
 	// Disable change polling in China region
-	// See: https://github.com/rclone/rclone/issues/6444
+	// See: https://github.com/morecup/rclone/issues/6444
 	if f.opt.Region == regionCN {
 		f.features.ChangeNotify = nil
 	}

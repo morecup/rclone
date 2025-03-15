@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/lib/version"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/lib/version"
 )
 
 // Error describes a B2 error response

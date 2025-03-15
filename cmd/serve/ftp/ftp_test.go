@@ -11,11 +11,11 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/rclone/rclone/backend/local"
-	"github.com/rclone/rclone/cmd/serve/servetest"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/config/configmap"
-	"github.com/rclone/rclone/fs/config/obscure"
+	_ "github.com/morecup/rclone/backend/local"
+	"github.com/morecup/rclone/cmd/serve/servetest"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/config/configmap"
+	"github.com/morecup/rclone/fs/config/obscure"
 	"github.com/stretchr/testify/assert"
 	ftp "goftp.io/server/v2"
 )

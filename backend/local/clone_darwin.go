@@ -9,8 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/go-darwin/apfs"
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 )
 
 // Copy src to this remote using server-side copy operations.

@@ -5,12 +5,12 @@ package vfs_test
 import (
 	"testing"
 
-	_ "github.com/rclone/rclone/backend/all" // import all the backends
-	"github.com/rclone/rclone/cmd/mountlib"
-	"github.com/rclone/rclone/fstest"
-	"github.com/rclone/rclone/vfs"
-	"github.com/rclone/rclone/vfs/vfscommon"
-	"github.com/rclone/rclone/vfs/vfstest"
+	_ "github.com/morecup/rclone/backend/all" // import all the backends
+	"github.com/morecup/rclone/cmd/mountlib"
+	"github.com/morecup/rclone/fstest"
+	"github.com/morecup/rclone/vfs"
+	"github.com/morecup/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/vfs/vfstest"
 )
 
 // TestFunctional runs more functional tests all the tests against all the

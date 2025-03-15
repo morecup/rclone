@@ -3,10 +3,10 @@ package db
 import (
 	"bytes"
 	"context"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/lib/paths"
 	"github.com/pkg/errors"
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/lib/paths"
 	"gorm.io/gorm"
 	"io"
 	"os"

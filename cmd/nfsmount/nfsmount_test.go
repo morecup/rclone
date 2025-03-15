@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/rclone/rclone/cmd/serve/nfs"
-	"github.com/rclone/rclone/vfs/vfscommon"
-	"github.com/rclone/rclone/vfs/vfstest"
+	"github.com/morecup/rclone/cmd/serve/nfs"
+	"github.com/morecup/rclone/vfs/vfscommon"
+	"github.com/morecup/rclone/vfs/vfstest"
 	"github.com/stretchr/testify/require"
 )
 

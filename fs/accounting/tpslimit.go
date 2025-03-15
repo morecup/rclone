@@ -3,7 +3,7 @@ package accounting
 import (
 	"context"
 
-	"github.com/rclone/rclone/fs"
+	"github.com/morecup/rclone/fs"
 	"golang.org/x/time/rate"
 )
 

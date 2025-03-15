@@ -13,13 +13,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/rclone/rclone/fs"
-	"github.com/rclone/rclone/fs/accounting"
-	"github.com/rclone/rclone/fs/filter"
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/fs/hash"
-	"github.com/rclone/rclone/fs/march"
-	"github.com/rclone/rclone/lib/readers"
+	"github.com/morecup/rclone/fs"
+	"github.com/morecup/rclone/fs/accounting"
+	"github.com/morecup/rclone/fs/filter"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/fs/hash"
+	"github.com/morecup/rclone/fs/march"
+	"github.com/morecup/rclone/lib/readers"
 	"golang.org/x/text/unicode/norm"
 )
 

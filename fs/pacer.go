@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/rclone/rclone/fs/fserrors"
-	"github.com/rclone/rclone/lib/pacer"
+	"github.com/morecup/rclone/fs/fserrors"
+	"github.com/morecup/rclone/lib/pacer"
 )
 
 // Pacer is a simple wrapper around a pacer.Pacer with logging.
