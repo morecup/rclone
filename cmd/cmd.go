@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -540,6 +541,7 @@ func AddBackendFlags() {
 
 // Main runs rclone interpreting flags and commands out of os.Args
 func Main() {
+	defer RecoverAndLog()
 	setupRootCommand(Root)
 	AddBackendFlags()
 	if err := Root.Execute(); err != nil {
@@ -548,5 +550,12 @@ func Main() {
 		}
 		fs.Logf(nil, "Fatal error: %v", err)
 		os.Exit(exitcode.UsageError)
+	}
+}
+
+func RecoverAndLog() {
+	if r := recover(); r != nil {
+		buf := debug.Stack()
+		fs.LogPrintf(fs.LogLevelError, nil, "Panic recovered: %v\nStack trace:\n%s", r, buf)
 	}
 }
