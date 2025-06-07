@@ -248,7 +248,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		CaseInsensitive:         false,
 		ReadMimeType:            true,
 		CanHaveEmptyDirectories: true,
-		ServerSideAcrossConfigs: opt.ServerSideAcrossConfigs,
+		ServerSideAcrossConfigs: true,
 	}).Fill(ctx, f)
 	f.srv.Client.SetErrorHandler(errorHandler)
 
