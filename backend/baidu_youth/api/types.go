@@ -138,6 +138,16 @@ type CreateVO struct {
 	BaseItem
 }
 
+type QuotaInfoResponse struct {
+	BaseBaiduResponse
+	Total   int64  `json:"total"`
+	Used    int64  `json:"used"`
+	Free    int64  `json:"free"`
+	Extend  int    `json:"extend"`
+	Paid    int    `json:"paid"`
+	ShowMsg string `json:"show_msg"`
+}
+
 type BaseItem struct {
 	Ctime    int64  `json:"ctime"`
 	FromType int    `json:"from_type"`

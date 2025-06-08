@@ -79,6 +79,17 @@ func (b *BaiduApi) GetTemplateVariable() (opts *rest.Opts, err error) {
 	return opts, nil
 }
 
+func (b *BaiduApi) GetQuotaInfo() (opts *rest.Opts, err error) {
+	opts = &rest.Opts{
+		Method:     "GET",
+		Path:       "/youth/api/quota",
+		Parameters: url.Values{
+			//"fields": []string{"[\"bdstoken\",\"token\",\"uk\",\"isdocuser\",\"servertime\"]"},
+		},
+	}
+	return opts, nil
+}
+
 // Disguise as a Baidu client.can down all file but will be limit speed.
 func (b *BaiduApi) DownFileDisguiseBaiduClient(dLink string) (opts *rest.Opts, err error) {
 	opts = &rest.Opts{

@@ -628,3 +628,19 @@ func (f *Fs) Create(ctx context.Context, path string, preCreateFileData *api.Pre
 	})
 	return info, err
 }
+
+func (f *Fs) GetQuotaInfo(ctx context.Context) (*api.QuotaInfoResponse, error) {
+	opts, err := f.api.GetQuotaInfo()
+	if err != nil {
+		return nil, err
+	}
+	info := new(api.QuotaInfoResponse)
+	err = f.pacer.Call(func() (bool, error) {
+		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
+}
