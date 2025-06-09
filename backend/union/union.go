@@ -283,10 +283,15 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 		return nil, fs.ErrorCantCopy
 	}
 	var du *upstream.Fs
-	for _, u := range f.upstreams {
-		if operations.Same(u.RootFs, su.RootFs) {
-			du = u
+	dus, err2 := f.createPolicy.Create(ctx, f.upstreams, remote)
+	if err2 != nil {
+		for _, u := range f.upstreams {
+			if operations.Same(u.RootFs, su.RootFs) {
+				du = u
+			}
 		}
+	} else {
+		du = dus[0]
 	}
 	if du == nil {
 		return nil, fs.ErrorCantCopy
@@ -294,7 +299,7 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	if !du.IsCreatable() {
 		return nil, fs.ErrorPermissionDenied
 	}
-	co, err := du.Features().Copy(ctx, o, remote)
+	co, err := du.Features().Copy(ctx, o.UnWrap(), remote)
 	if err != nil || co == nil {
 		return nil, err
 	}
