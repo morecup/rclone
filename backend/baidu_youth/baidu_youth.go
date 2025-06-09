@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/rclone/rclone/backend/baidu_netdisk"
 	"github.com/rclone/rclone/backend/baidu_youth/api"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/config"
@@ -519,6 +520,10 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 //
 // If it isn't possible then return fs.ErrorCantCopy
 func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	serviceCopy, err2 := f.ServerSideCrossServiceCopy(ctx, src, remote)
+	if err2 == nil {
+		return serviceCopy, nil
+	}
 	srcObj, ok := src.(*Object)
 	if !ok {
 		fs.Debugf(src, "Can't copy - not same remote type")
@@ -543,6 +548,36 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	}
 	srcObj.remote = remote
 	return srcObj, nil
+}
+
+func (f *Fs) CanServerSideCrossServiceCopy(srcFs fs.Info, remote string) bool {
+	_, ok := srcFs.(*baidu_netdisk.Fs)
+	return ok
+}
+
+func (f *Fs) ServerSideCrossServiceCopy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	srcObject, _ := src.(*baidu_netdisk.Object)
+	if srcObject != nil {
+		contentMd5 := srcObject.ContentMd5(ctx)
+		sliceMd5, err := srcObject.SliceMd5(ctx)
+		if err != nil {
+			return nil, err
+		}
+		item, success, err := f.Rapid(ctx, f.ToAbsolutePath(remote), contentMd5, sliceMd5, src.Size())
+		if err != nil {
+			return nil, err
+		}
+		if !success {
+			return nil, fmt.Errorf("failed to rapid upload")
+		}
+		baseItem, err := f.NewObjectFromBaseItem(item)
+		if err != nil {
+			return nil, err
+		}
+		return baseItem, nil
+	} else {
+		return nil, fmt.Errorf("src is not supporded")
+	}
 }
 
 func (f *Fs) About(ctx context.Context) (*fs.Usage, error) {

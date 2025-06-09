@@ -3,6 +3,7 @@ package baidu_netdisk
 import (
 	"context"
 	"errors"
+	"github.com/rclone/rclone/backend/baidu_netdisk/api"
 	"github.com/rclone/rclone/fs"
 	"github.com/rclone/rclone/fs/hash"
 	"io"
@@ -15,15 +16,16 @@ import (
 //
 // Will definitely have info but maybe not meta
 type Object struct {
-	fs            *Fs       // what this object is part of
-	remote        string    // The remote path  absolute path
-	hasMetaData   bool      // whether info below has been set
-	isOneNoteFile bool      // Whether the object is a OneNote file
-	size          int64     // size of the object
-	modTime       time.Time // modification time of the object
-	id            string    // ID of the object
-	hash          string    // Hash of the content, usually QuickXorHash but set as hash_type
-	mimeType      string    // Content-Type of object from server (may not be as uploaded)
+	fs              *Fs       // what this object is part of
+	remote          string    // The remote path  absolute path
+	hasMetaData     bool      // whether info below has been set
+	isOneNoteFile   bool      // Whether the object is a OneNote file
+	size            int64     // size of the object
+	modTime         time.Time // modification time of the object
+	id              string    // ID of the object
+	hash            string    // Hash of the content, usually QuickXorHash but set as hash_type
+	mimeType        string    // Content-Type of object from server (may not be as uploaded)
+	baiduNetDiskMd5 string    //md5值（百度网盘特有值）
 }
 
 // ------------------------------------------------------------
@@ -112,6 +114,26 @@ func (o *Object) Open(ctx context.Context, options ...fs.OpenOption) (in io.Read
 	}
 	fs.FixRangeOption(options, o.size)
 	return o.fs.DownFileSerial(ctx, o.remote, o.size, options)
+}
+
+func (o *Object) ContentMd5(ctx context.Context) string {
+	return api.DecryptMd5(o.baiduNetDiskMd5)
+}
+
+func (o *Object) SliceMd5(ctx context.Context) (string, error) {
+	if o.size <= sliceSize {
+		return o.ContentMd5(ctx), nil
+	}
+	rangeOpt := fs.RangeOption{End: sliceSize - 1}
+	in, err := o.OpenOld(ctx, &rangeOpt)
+	if err != nil {
+		return "", err
+	}
+	md5, err := api.Md5(in, sliceSize)
+	if err != nil {
+		return "", err
+	}
+	return md5, nil
 }
 
 // Update the object with the contents of the io.Reader, modTime and size

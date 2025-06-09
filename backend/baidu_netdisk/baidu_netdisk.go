@@ -637,15 +637,16 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		entry = NewDir(f, dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
 	} else if info.IsDir == 0 {
 		entry = &Object{
-			fs:            f,
-			remote:        dir + info.ServerFilename,
-			hasMetaData:   true,
-			isOneNoteFile: false,
-			size:          info.Size,
-			modTime:       time.Unix(info.LocalMtime, 0),
-			id:            strconv.Itoa(int(info.FsID)),
-			hash:          "md5",
-			mimeType:      "json",
+			fs:              f,
+			remote:          dir + info.ServerFilename,
+			hasMetaData:     true,
+			isOneNoteFile:   false,
+			size:            info.Size,
+			modTime:         time.Unix(info.LocalMtime, 0),
+			id:              strconv.Itoa(int(info.FsID)),
+			hash:            "md5",
+			mimeType:        "json",
+			baiduNetDiskMd5: info.Md5,
 		}
 	}
 	return entry, nil
@@ -657,15 +658,16 @@ func (f *Fs) NewObjectFromBaseItem(item *api.BaseItem) (*Object, error) {
 		return nil, err
 	}
 	object := &Object{
-		fs:            f,
-		remote:        relativePath,
-		hasMetaData:   true,
-		isOneNoteFile: false,
-		size:          item.Size,
-		modTime:       time.Unix(item.Mtime, 0),
-		id:            strconv.FormatInt(item.FsId, 10),
-		hash:          item.Md5,
-		mimeType:      "json",
+		fs:              f,
+		remote:          relativePath,
+		hasMetaData:     true,
+		isOneNoteFile:   false,
+		size:            item.Size,
+		modTime:         time.Unix(item.Mtime, 0),
+		id:              strconv.FormatInt(item.FsId, 10),
+		hash:            item.Md5,
+		mimeType:        "json",
+		baiduNetDiskMd5: item.Md5,
 	}
 	return object, nil
 }
