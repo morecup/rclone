@@ -317,3 +317,25 @@ func (b *BaiduApi) Create(path string, preCreateFileData *PreCreateFileData, upl
 	}
 	return opts, nil
 }
+
+func (b *BaiduApi) Rapid(path string, contentMd5 string, sliceMd5 string, size int64) (opts *rest.Opts, err error) {
+	data := url.Values{}
+	data.Add("path", FixToBaiduPath(path))
+	data.Add("content-length", strconv.FormatInt(size, 10))
+	data.Add("content-md5", contentMd5)
+	data.Add("slice-md5", sliceMd5)
+	data.Add("rtype", "1")
+	data.Add("ondup", "newcopy")
+
+	opts = &rest.Opts{
+		Method:  "POST",
+		RootURL: "https://d.pcs.baidu.com/rest/2.0/pcs/file",
+		Parameters: url.Values{
+			"method": []string{"rapidupload"},
+			//"app_id":	[]string{"25179614"},
+		},
+		ContentType: "application/x-www-form-urlencoded",
+		Body:        strings.NewReader(data.Encode()),
+	}
+	return opts, nil
+}

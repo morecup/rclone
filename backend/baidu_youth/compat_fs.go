@@ -644,3 +644,24 @@ func (f *Fs) GetQuotaInfo(ctx context.Context) (*api.QuotaInfoResponse, error) {
 	}
 	return info, nil
 }
+
+// Rapid fs.ErrorFileRapidUpload
+func (f *Fs) Rapid(ctx context.Context, path string, contentMd5 string, sliceMd5 string, size int64) (baseItem *api.BaseItem, success bool, err error) {
+	info := new(api.RapidVO)
+	err = f.pacer.Call(func() (bool, error) {
+		opts, err := f.api.Rapid(path, contentMd5, sliceMd5, size)
+		if err != nil {
+			return false, err
+		}
+		resp, err := f.srv.CallJSON(ctx, opts, nil, info)
+		return shouldRetry(ctx, resp, err)
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if info != nil {
+		return &info.BaseItem, true, nil
+	} else {
+		return nil, false, fs.ErrorFileRapidUpload
+	}
+}

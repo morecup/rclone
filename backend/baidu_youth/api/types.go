@@ -138,6 +138,21 @@ type CreateVO struct {
 	BaseItem
 }
 
+type PcsBaseBaiduResponse struct {
+	ErrnoCode int   `json:"error_code"`
+	ErrorMsg  int   `json:"error_msg"`
+	RequestId int64 `json:"request_id"`
+}
+
+func (b PcsBaseBaiduResponse) GetErrno() int {
+	return b.ErrnoCode
+}
+
+type RapidVO struct {
+	BaseBaiduResponse
+	BaseItem
+}
+
 type QuotaInfoResponse struct {
 	BaseBaiduResponse
 	Total   int64  `json:"total"`
