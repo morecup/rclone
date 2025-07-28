@@ -1,26 +1,25 @@
-package baidu_netdisk
+package baidu_youth
 
 import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/morecup/rclone/backend/baidu_netdisk/api"
-	"github.com/morecup/rclone/fs"
-	"github.com/morecup/rclone/fs/config"
-	"github.com/morecup/rclone/fs/config/configmap"
-	"github.com/morecup/rclone/fs/config/configstruct"
-	"github.com/morecup/rclone/fs/config/obscure"
-	"github.com/morecup/rclone/fs/fshttp"
-	"github.com/morecup/rclone/fs/hash"
-	"github.com/morecup/rclone/lib/dircache"
-	"github.com/morecup/rclone/lib/encoder"
-	"github.com/morecup/rclone/lib/oauthutil"
-	"github.com/morecup/rclone/lib/pacer"
-	"github.com/morecup/rclone/lib/persistjar"
-	"github.com/morecup/rclone/lib/rest"
 	"github.com/pkg/errors"
+	"github.com/rclone/rclone/backend/baidu_netdisk"
+	"github.com/rclone/rclone/backend/baidu_youth/api"
+	"github.com/rclone/rclone/fs"
+	"github.com/rclone/rclone/fs/config"
+	"github.com/rclone/rclone/fs/config/configmap"
+	"github.com/rclone/rclone/fs/config/configstruct"
+	"github.com/rclone/rclone/fs/fshttp"
+	"github.com/rclone/rclone/fs/hash"
+	"github.com/rclone/rclone/lib/dircache"
+	"github.com/rclone/rclone/lib/encoder"
+	"github.com/rclone/rclone/lib/oauthutil"
+	"github.com/rclone/rclone/lib/pacer"
+	"github.com/rclone/rclone/lib/persistjar"
+	"github.com/rclone/rclone/lib/rest"
 	"golang.org/x/net/publicsuffix"
-	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"net/url"
@@ -37,49 +36,14 @@ const (
 	minSleep                    = 10 * time.Millisecond
 	maxSleep                    = 2 * time.Second
 	decayConstant               = 2 // bigger for slower decay, exponential
-	configDriveID               = "drive_id"
-	configDriveType             = "drive_type"
-	driveTypePersonal           = "personal"
-	driveTypeBusiness           = "business"
-	driveTypeSharepoint         = "documentLibrary"
 	defaultChunkSize            = 10 * fs.Mebi
 	chunkSizeMultiple           = 320 * fs.Kibi
-
-	regionGlobal = "global"
-	regionUS     = "us"
-	regionDE     = "de"
-	regionCN     = "cn"
+	regionCN                    = "cn"
 )
 
 // Globals
 var (
-	authPath  = "/common/oauth2/v2.0/authorize"
-	tokenPath = "/common/oauth2/v2.0/token"
-
-	scopeAccess             = fs.SpaceSepList{"Files.Read", "Files.ReadWrite", "Files.Read.All", "Files.ReadWrite.All", "Sites.Read.All", "offline_access"}
-	scopeAccessWithoutSites = fs.SpaceSepList{"Files.Read", "Files.ReadWrite", "Files.Read.All", "Files.ReadWrite.All", "offline_access"}
-
-	// Description of how to auth for this app for a business account
-	oauthConfig = &oauth2.Config{
-		Scopes:       scopeAccess,
-		ClientID:     rcloneClientID,
-		ClientSecret: obscure.MustReveal(rcloneEncryptedClientSecret),
-		RedirectURL:  oauthutil.RedirectLocalhostURL,
-	}
-
-	graphAPIEndpoint = map[string]string{
-		"global": "https://graph.microsoft.com",
-		"us":     "https://graph.microsoft.us",
-		"de":     "https://graph.microsoft.de",
-		"cn":     "https://microsoftgraph.chinacloudapi.cn",
-	}
-
-	authEndpoint = map[string]string{
-		"global": "https://login.microsoftonline.com",
-		"us":     "https://login.microsoftonline.us",
-		"de":     "https://login.microsoftonline.de",
-		"cn":     "https://login.chinacloudapi.cn",
-	}
+	scopeAccess = fs.SpaceSepList{"Files.Read", "Files.ReadWrite", "Files.Read.All", "Files.ReadWrite.All", "Sites.Read.All", "offline_access"}
 
 	// QuickXorHashType is the hash.Type for OneDrive
 	QuickXorHashType hash.Type
@@ -88,8 +52,8 @@ var (
 // Register with Fs
 func init() {
 	fs.Register(&fs.RegInfo{
-		Name:        "baidu_netdisk",
-		Description: "百度网盘",
+		Name:        "baidu_youth",
+		Description: "百度网盘青春版",
 		NewFs:       NewFs,
 		Config:      Config,
 		Options: []fs.Option{{
@@ -144,9 +108,9 @@ func Config(ctx context.Context, name string, m configmap.Mapper, config fs.Conf
 	cookieJar.SetCookies(cookieURL, cookies)
 	client.Jar = cookieJar
 
-	resp, _ := client.Get("https://pan.baidu.com/login")
+	resp, _ := client.Get("https://pan.baidu.com/youth/pan/main")
 	defer resp.Body.Close()
-	if strings.Contains(resp.Request.URL.String(), "https://pan.baidu.com/disk/main") {
+	if strings.Contains(resp.Request.URL.String(), "https://pan.baidu.com/youth/pan/main") {
 		// 读取响应体
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		bodyString := string(bodyBytes)
@@ -223,16 +187,7 @@ func checkUploadChunkSize(cs fs.SizeSuffix) error {
 
 // errorHandler parses a non 2xx error response into an error
 func errorHandler(resp *http.Response) error {
-	//// Decode error response
-	//errResponse := new(api.Error)
-	//err := rest.DecodeJSON(resp, &errResponse)
-	//if err != nil {
-	//	fs.Debugf(nil, "Couldn't decode error response: %v", err)
-	//}
-	//if errResponse.ErrorInfo.Code == "" {
-	//	errResponse.ErrorInfo.Code = resp.Status
-	//}
-	//return errResponse
+
 	return fmt.Errorf("error response %v", resp)
 }
 
@@ -256,20 +211,7 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, fmt.Errorf("onedrive: chunk size: %w", err)
 	}
 
-	//if opt.DriveID == "" || opt.DriveType == "" {
-	//	return nil, errors.New("unable to get drive_id and drive_type - if you are upgrading from older versions of rclone, please run `rclone config` and re-configure this backend")
-	//}
-
-	//rootURL := graphAPIEndpoint[opt.Region] + "/v1.0" + "/drives/" + opt.DriveID
 	rootURL := "https://pan.baidu.com"
-	//oauthConfig.Scopes = opt.AccessScopes
-	//if opt.DisableSitePermission {
-	//	oauthConfig.Scopes = scopeAccessWithoutSites
-	//}
-	//oauthConfig.Endpoint = oauth2.Endpoint{
-	//	AuthURL:  authEndpoint[opt.Region] + authPath,
-	//	TokenURL: authEndpoint[opt.Region] + tokenPath,
-	//}
 
 	client := fshttp.NewClient(ctx)
 	cookieJar, _ := persistjar.New(&persistjar.Options{PublicSuffixList: publicsuffix.List}, m, "")
@@ -287,10 +229,8 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 	}
 
 	transport := client.Transport.(*fshttp.Transport)
-	//netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia
-	//netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;
+
 	transport.SetUserAgent("netdisk;7.0.1.1;PC;PC-Windows;10.0.22621;WindowsBaiduYunGuanJia")
-	//transport.SetUserAgent("netdisk;12.8.1;23043RP34C;android-android;13;JSbridge4.4.0;jointBridge;1.1.0;")
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	f := &Fs{
 		name:     name,
@@ -331,31 +271,9 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		return nil, err
 	}
 
-	// Disable change polling in China region
-	// See: https://github.com/morecup/rclone/issues/6444
 	if f.opt.Region == regionCN {
 		f.features.ChangeNotify = nil
 	}
-
-	//// Renew the token in the background
-	//f.tokenRenewer = oauthutil.NewRenew(f.String(), ts, func() error {
-	//	_, _, err := f.readMetaDataForPath(ctx, "")
-	//	return err
-	//})
-
-	//// Get rootID
-	//var rootID = opt.RootFolderID
-	//if rootID == "" {
-	//	rootInfo, _, err := f.GetFileMeta(ctx, root, false, false)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("failed to get root: %w", err)
-	//	}
-	//	rootID = strconv.Itoa(rootInfo.FsID)
-	//}
-	//if rootID == "" {
-	//	return nil, errors.New("failed to get root: ID was empty")
-	//}
-	//f.dirCache = dircache.New(root, rootID, f)
 
 	//if root is file path,fix root to dir path
 	item, _, err := f.GetFileMeta(ctx, "/"+f.root, false, false)
@@ -602,6 +520,10 @@ func (f *Fs) DirMove(ctx context.Context, src fs.Fs, srcRemote, dstRemote string
 //
 // If it isn't possible then return fs.ErrorCantCopy
 func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	serviceCopy, err2 := f.ServerSideCrossServiceCopy(ctx, src, remote)
+	if err2 == nil {
+		return serviceCopy, nil
+	}
 	srcObj, ok := src.(*Object)
 	if !ok {
 		fs.Debugf(src, "Can't copy - not same remote type")
@@ -628,6 +550,49 @@ func (f *Fs) Copy(ctx context.Context, src fs.Object, remote string) (fs.Object,
 	return srcObj, nil
 }
 
+func (f *Fs) CanServerSideCrossServiceCopy(srcFs fs.Info, remote string) bool {
+	_, ok := srcFs.(*baidu_netdisk.Fs)
+	return ok
+}
+
+func (f *Fs) ServerSideCrossServiceCopy(ctx context.Context, src fs.Object, remote string) (fs.Object, error) {
+	srcObject, _ := src.(*baidu_netdisk.Object)
+	if srcObject != nil {
+		contentMd5 := srcObject.ContentMd5(ctx)
+		sliceMd5, err := srcObject.SliceMd5(ctx)
+		if err != nil {
+			return nil, err
+		}
+		item, success, err := f.Rapid(ctx, f.ToAbsolutePath(remote), contentMd5, sliceMd5, src.Size())
+		if err != nil {
+			return nil, err
+		}
+		if !success {
+			return nil, fmt.Errorf("failed to rapid upload")
+		}
+		baseItem, err := f.NewObjectFromBaseItem(item)
+		if err != nil {
+			return nil, err
+		}
+		return baseItem, nil
+	} else {
+		return nil, fmt.Errorf("src is not supporded")
+	}
+}
+
+func (f *Fs) About(ctx context.Context) (*fs.Usage, error) {
+	info, err := f.GetQuotaInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	usage := &fs.Usage{
+		Total: fs.NewUsageValue(info.Total), // quota of bytes that can be used
+		Used:  fs.NewUsageValue(info.Used),  // bytes in use
+		Free:  fs.NewUsageValue(info.Free),  // bytes which can be uploaded before reaching the quota
+	}
+	return usage, nil
+}
+
 // Convert a list item into fs.Directory or fs.Object
 func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) (entry fs.DirEntry, err error) {
 	if dir != "" {
@@ -637,16 +602,15 @@ func (f *Fs) itemToDirOrObject(ctx context.Context, dir string, info *api.Item) 
 		entry = NewDir(f, dir+info.ServerFilename, time.Unix(info.LocalMtime, 0)).SetID(strconv.Itoa(int(info.FsID))).SetItems(-1).SetSize(-1)
 	} else if info.IsDir == 0 {
 		entry = &Object{
-			fs:              f,
-			remote:          dir + info.ServerFilename,
-			hasMetaData:     true,
-			isOneNoteFile:   false,
-			size:            info.Size,
-			modTime:         time.Unix(info.LocalMtime, 0),
-			id:              strconv.Itoa(int(info.FsID)),
-			hash:            "md5",
-			mimeType:        "json",
-			baiduNetDiskMd5: info.Md5,
+			fs:            f,
+			remote:        dir + info.ServerFilename,
+			hasMetaData:   true,
+			isOneNoteFile: false,
+			size:          info.Size,
+			modTime:       time.Unix(info.LocalMtime, 0),
+			id:            strconv.Itoa(int(info.FsID)),
+			hash:          "md5",
+			mimeType:      "json",
 		}
 	}
 	return entry, nil
@@ -658,16 +622,15 @@ func (f *Fs) NewObjectFromBaseItem(item *api.BaseItem) (*Object, error) {
 		return nil, err
 	}
 	object := &Object{
-		fs:              f,
-		remote:          relativePath,
-		hasMetaData:     true,
-		isOneNoteFile:   false,
-		size:            item.Size,
-		modTime:         time.Unix(item.Mtime, 0),
-		id:              strconv.FormatInt(item.FsId, 10),
-		hash:            item.Md5,
-		mimeType:        "json",
-		baiduNetDiskMd5: item.Md5,
+		fs:            f,
+		remote:        relativePath,
+		hasMetaData:   true,
+		isOneNoteFile: false,
+		size:          item.Size,
+		modTime:       time.Unix(item.Mtime, 0),
+		id:            strconv.FormatInt(item.FsId, 10),
+		hash:          item.Md5,
+		mimeType:      "json",
 	}
 	return object, nil
 }

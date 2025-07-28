@@ -308,22 +308,22 @@ func (f Fs) Put(ctx context.Context, in io.Reader, src fs.ObjectInfo, options ..
 		dir = ""
 	}
 	entries, err := f.FileStructure.List(ctx, dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, entry := range entries {
-		object, ok := entry.(fs.Object)
-		if ok {
-			suffix := strings.HasSuffix(object.Remote(), "￥}"+path.Base(src.Remote()))
-			if suffix {
-				err := object.Remove(ctx)
-				if err != nil {
-					return nil, err
+	if err == nil {
+		for _, entry := range entries {
+			object, ok := entry.(fs.Object)
+			if ok {
+				suffix := strings.HasSuffix(object.Remote(), "￥}"+path.Base(src.Remote()))
+				if suffix {
+					err := object.Remove(ctx)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
-		}
 
+		}
 	}
+
 	structureObject, err := f.FileStructure.Put(ctx, bytes.NewReader(chunkFileJson), NewObjectInfoWrapper(src, chunkRemote, int64(len(chunkFileJson))))
 	if err != nil {
 		return nil, err

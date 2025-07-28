@@ -10,11 +10,14 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	jsoniter "github.com/json-iterator/go"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
+	"unsafe"
 
 	"github.com/morecup/rclone/fs"
 	"github.com/morecup/rclone/lib/readers"
@@ -191,8 +194,27 @@ func checkDrainAndClose(r io.ReadCloser, err *error) {
 // DecodeJSON decodes resp.Body into result
 func DecodeJSON(resp *http.Response, result interface{}) (err error) {
 	defer checkDrainAndClose(resp.Body, &err)
-	decoder := json.NewDecoder(resp.Body)
+	var json1 = jsoniter.ConfigCompatibleWithStandardLibrary
+	decoder := json1.NewDecoder(resp.Body)
 	return decoder.Decode(result)
+}
+
+func init() {
+	jsoniter.RegisterTypeDecoderFunc("int64", func(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
+		switch iter.WhatIsNext() {
+		case jsoniter.NumberValue:
+			*(*int64)(ptr) = iter.ReadInt64()
+		case jsoniter.StringValue:
+			s := iter.ReadString()
+			if val, err := strconv.ParseInt(s, 10, 64); err == nil {
+				*(*int64)(ptr) = val
+			} else {
+				iter.ReportError("decode int64", "invalid string to int64")
+			}
+		default:
+			iter.ReportError("decode int64", "not number or string")
+		}
+	})
 }
 
 // DecodeXML decodes resp.Body into result

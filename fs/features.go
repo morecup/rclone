@@ -195,6 +195,20 @@ type Features struct {
 	// Shutdown the backend, closing any background tasks and any
 	// cached connections.
 	Shutdown func(ctx context.Context) error
+
+	// CanServerSideCrossServiceCopy 判断是否可以进行跨服务的服务器端拷贝
+	//
+	// 传入源文件系统和目标路径，返回是否支持跨服务拷贝
+	CanServerSideCrossServiceCopy func(srcFs Info, remote string) bool
+
+	// ServerSideCrossServiceCopy 执行跨服务的服务器端拷贝操作
+	//
+	// 此方法用于将源对象从一个服务复制到另一个服务
+	//
+	// 返回目标对象和可能出现的错误
+	//
+	// 如果无法执行操作，则返回 fs.ErrorCantCopy
+	ServerSideCrossServiceCopy func(ctx context.Context, src Object, remote string) (Object, error)
 }
 
 // Disable nil's out the named feature.  If it isn't found then it
@@ -346,6 +360,12 @@ func (ft *Features) Fill(ctx context.Context, f Fs) *Features {
 	}
 	if do, ok := f.(Shutdowner); ok {
 		ft.Shutdown = do.Shutdown
+	}
+	if do, ok := f.(CanServerSideCrossServiceCopy); ok {
+		ft.CanServerSideCrossServiceCopy = do.CanServerSideCrossServiceCopy
+	}
+	if do, ok := f.(ServerSideCrossServiceCopy); ok {
+		ft.ServerSideCrossServiceCopy = do.ServerSideCrossServiceCopy
 	}
 	return ft.DisableList(GetConfig(ctx).DisableFeatures)
 }
@@ -766,6 +786,14 @@ type Shutdowner interface {
 	// Shutdown the backend, closing any background tasks and any
 	// cached connections.
 	Shutdown(ctx context.Context) error
+}
+
+type CanServerSideCrossServiceCopy interface {
+	CanServerSideCrossServiceCopy(srcFs Info, remote string) bool
+}
+
+type ServerSideCrossServiceCopy interface {
+	ServerSideCrossServiceCopy(ctx context.Context, src Object, remote string) (Object, error)
 }
 
 // ObjectsChan is a channel of Objects

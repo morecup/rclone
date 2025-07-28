@@ -141,6 +141,13 @@ func (c *copy) serverSideCopy(ctx context.Context) (actionTaken string, newDst f
 		serverSideCopyOK = true
 	} else if SameRemoteType(c.src.Fs(), c.f) {
 		serverSideCopyOK = c.dstFeatures.ServerSideAcrossConfigs || c.ci.ServerSideAcrossConfigs
+	} else if c.dstFeatures.CanServerSideCrossServiceCopy != nil && c.dstFeatures.ServerSideCrossServiceCopy != nil {
+		// 判断是否支持跨服务拷贝
+		serverSideCopyOK = c.dstFeatures.CanServerSideCrossServiceCopy(c.src.Fs(), c.remoteForCopy)
+		if serverSideCopyOK {
+			// 使用跨服务的服务器端拷贝方法
+			doCopy = c.dstFeatures.ServerSideCrossServiceCopy
+		}
 	}
 	if !serverSideCopyOK {
 		return actionTaken, nil, fs.ErrorCantCopy

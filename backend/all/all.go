@@ -9,6 +9,7 @@ import (
 	_ "github.com/morecup/rclone/backend/b2"
 	_ "github.com/morecup/rclone/backend/baidu_netdisk"
 	_ "github.com/morecup/rclone/backend/baidu_photo"
+	_ "github.com/morecup/rclone/backend/baidu_youth"
 	_ "github.com/morecup/rclone/backend/better_chunk"
 	_ "github.com/morecup/rclone/backend/box"
 	_ "github.com/morecup/rclone/backend/cache"
