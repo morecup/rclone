@@ -1,6 +1,6 @@
 package api
 
-import "github.com/rclone/rclone/fs"
+import "github.com/morecup/rclone/fs"
 
 type BaseBaiduResponse struct {
 	Errno     int   `json:"errno"`
